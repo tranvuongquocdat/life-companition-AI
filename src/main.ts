@@ -1,13 +1,33 @@
-import { Plugin } from "obsidian";
+import { Notice, Plugin } from "obsidian";
 import { ChatView, VIEW_TYPE_CHAT } from "./ChatView";
+import { ClaudeClient } from "./claude";
+import { ProfileManager } from "./profile";
+import { buildSystemPrompt } from "./prompts";
 import { LifeCompanionSettingTab } from "./settings";
-import { DEFAULT_SETTINGS, type ChatMode, type LifeCompanionSettings } from "./types";
+import {
+  DEFAULT_SETTINGS,
+  type ChatMode,
+  type LifeCompanionSettings,
+} from "./types";
+import { VaultTools } from "./vault-tools";
+import type Anthropic from "@anthropic-ai/sdk";
 
 export default class LifeCompanionPlugin extends Plugin {
   settings: LifeCompanionSettings;
+  claudeClient: ClaudeClient | null = null;
+  vaultTools: VaultTools;
+  profileManager: ProfileManager;
+  conversationHistory: Anthropic.MessageParam[] = [];
 
   async onload() {
     await this.loadSettings();
+
+    this.vaultTools = new VaultTools(this.app);
+    this.profileManager = new ProfileManager(this.app);
+
+    if (this.settings.apiKey) {
+      this.claudeClient = new ClaudeClient(this.settings.apiKey);
+    }
 
     this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
@@ -22,6 +42,11 @@ export default class LifeCompanionPlugin extends Plugin {
     });
 
     this.addSettingTab(new LifeCompanionSettingTab(this.app, this));
+
+    // Ensure _life/ folder structure exists
+    this.app.workspace.onLayoutReady(async () => {
+      await this.profileManager.ensureLifeFolder();
+    });
   }
 
   async onunload() {
@@ -40,8 +65,63 @@ export default class LifeCompanionPlugin extends Plugin {
   }
 
   async handleMessage(text: string, mode: ChatMode, view: ChatView) {
-    // Placeholder — will be implemented in Task 7
-    view.addAssistantMessage("(Claude API chưa kết nối — sẽ implement ở bước tiếp)");
+    if (!this.settings.apiKey) {
+      view.addAssistantMessage(
+        "Chưa có API key. Vào Settings → Life Companion để nhập API key nhé."
+      );
+      return;
+    }
+
+    if (!this.claudeClient) {
+      this.claudeClient = new ClaudeClient(this.settings.apiKey);
+    }
+
+    const model = mode === "quick" ? this.settings.quickModel : this.settings.diveModel;
+
+    try {
+      const profile = await this.profileManager.getProfile();
+      const index = await this.profileManager.getIndex();
+      const systemPrompt = buildSystemPrompt(profile, index, mode);
+
+      const streamEl = view.createStreamingMessage();
+      let accumulatedText = "";
+
+      const response = await this.claudeClient.sendMessage({
+        userMessage: text,
+        mode,
+        model,
+        systemPrompt,
+        conversationHistory: this.conversationHistory,
+        vaultTools: this.vaultTools,
+        onText: (chunk) => {
+          accumulatedText += chunk;
+          streamEl.textContent = accumulatedText;
+          view.scrollToBottom();
+        },
+        onToolUse: (name, input) => {
+          const toolMsg = `🔧 ${name}...`;
+          if (!accumulatedText.includes(toolMsg)) {
+            accumulatedText += `\n${toolMsg}\n`;
+            streamEl.textContent = accumulatedText;
+          }
+        },
+      });
+
+      // Update conversation history
+      this.conversationHistory.push(
+        { role: "user", content: text },
+        { role: "assistant", content: response }
+      );
+
+      // Keep history manageable (last 20 messages)
+      if (this.conversationHistory.length > 20) {
+        this.conversationHistory = this.conversationHistory.slice(-20);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      view.addAssistantMessage(`Lỗi: ${msg}`);
+      new Notice(`Life Companion error: ${msg}`);
+    }
   }
 
   async loadSettings() {
@@ -50,5 +130,12 @@ export default class LifeCompanionPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    if (this.settings.apiKey) {
+      if (this.claudeClient) {
+        this.claudeClient.updateApiKey(this.settings.apiKey);
+      } else {
+        this.claudeClient = new ClaudeClient(this.settings.apiKey);
+      }
+    }
   }
 }
