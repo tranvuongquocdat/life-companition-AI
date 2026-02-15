@@ -8,26 +8,29 @@ Turn your Obsidian vault into a personal life management system. Life Companion 
 Ask questions about your vault, brainstorm ideas, or just have a conversation. The AI reads your notes, understands your structure, and responds with context — not generic answers.
 
 **Manage your calendar**
-Create events, set up recurring schedules (daily, weekly, monthly, or custom intervals), and see everything in a built-in calendar view. Works seamlessly with the Full Calendar plugin.
-
-**Organize your vault**
-Search notes, create new ones, move files around, manage tags and properties, extract tasks — all through natural conversation.
+Built-in calendar view with full event management. Create one-time or recurring events (daily, weekly, monthly, or custom intervals like "every 3 days"). Works seamlessly with the Full Calendar plugin.
 
 **Two conversation modes**
 - **Quick** — Fast, lightweight replies for quick questions and note capture
-- **Deep Dive** — Thorough research mode with web search, deep analysis, and multi-step reasoning
+- **Deep Dive** — Extended thinking mode with web search, deep analysis, and multi-step reasoning. When using Claude, the AI shows its thinking process in real-time.
+
+**Smart context management**
+The AI tracks how much context it's using and automatically summarizes older messages when the conversation gets long — so you never hit a wall mid-conversation. Token usage is displayed in real-time with actual counts from the API.
+
+**Organize your vault**
+Search notes, create new ones, move files around, manage tags and properties, extract tasks — all through natural conversation. The AI shows a live activity feed of what it's doing (searching, reading, writing) so you always know what's happening.
 
 **Multiple AI providers**
-Use whichever AI you prefer: Claude, OpenAI (ChatGPT), Gemini, or Groq. Switch models anytime.
+Use whichever AI you prefer: Claude, OpenAI (ChatGPT), Gemini, or Groq. Switch models anytime from the toolbar.
 
 **Chrome-style tabs**
 Run multiple conversations in parallel. Each tab remembers its own history.
 
-**Attach files**
+**File attachments**
 Drop in images, PDFs, or text files — the AI can read and discuss them.
 
 **Bilingual**
-Full English and Vietnamese support.
+Full English and Vietnamese support — including all tool activity descriptions.
 
 ## Getting Started
 
@@ -64,9 +67,9 @@ Go to **Settings → Life Companion** and add at least one API key:
 
 Click the Life Companion icon in the sidebar (or use the command palette). That's it — start typing and the AI will respond with full awareness of your vault.
 
-## What Gets Created in Your Vault
+## How the AI Works With Your Vault
 
-The plugin creates a few helper folders on first run:
+On first run, the plugin creates a few helper folders:
 
 ```
 _life/
@@ -77,6 +80,8 @@ _inbox/            ← Quick capture inbox
 _chats/            ← Your conversation history (auto-saved daily)
 ```
 
+The AI uses your profile and vault index to give personalized responses. Over time, it builds up context about your preferences, projects, and how you organize things.
+
 ## Available AI Tools
 
 The AI can perform **20+ actions** on your vault, all toggleable in settings:
@@ -86,8 +91,10 @@ The AI can perform **20+ actions** on your vault, all toggleable in settings:
 - **Connections** — View backlinks and outgoing links
 - **Tasks** — Find tasks across notes, toggle checkboxes
 - **Daily Notes** — Read or create today's daily note
-- **Calendar** — Create, update, delete events with recurring support
-- **Web** — Search the web and fetch pages (in Deep Dive mode)
+- **Calendar** — Create, update, delete events with full recurring support
+- **Web** — Search the web and fetch pages (Deep Dive mode)
+
+The AI is designed to be honest about its actions — if it claims it saved or created something, it actually called the tool. If something goes wrong, you'll see a warning instead of a false confirmation.
 
 ## Development
 
