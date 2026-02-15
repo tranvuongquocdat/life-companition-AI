@@ -41,6 +41,8 @@ export interface LifeCompanionSettings {
   savedConversations: SavedConversation[];
   // Dynamic model lists fetched from provider APIs
   customModels: Record<string, ModelEntry[]>;
+  // Calendar
+  calendarEventsDirectory: string;
   // Tabs
   openTabs: string[];
   activeTabId: string | null;
@@ -65,10 +67,13 @@ export const DEFAULT_SETTINGS: LifeCompanionSettings = {
     "get_backlinks", "get_outgoing_links",
     "get_tasks", "toggle_task",
     "get_daily_note", "create_daily_note",
+    "check_calendar_status", "get_events", "create_event",
+    "update_event", "delete_event", "get_upcoming_events",
   ],
   language: "en",
   savedConversations: [],
   customModels: {},
+  calendarEventsDirectory: "calendar",
   openTabs: [],
   activeTabId: null,
 };
@@ -162,7 +167,7 @@ export interface ToolInfo {
   name: string;
   displayName: string;
   description: string;
-  category: "vault" | "web" | "knowledge" | "graph" | "task" | "daily";
+  category: "vault" | "web" | "knowledge" | "graph" | "task" | "daily" | "calendar";
 }
 
 export const ALL_TOOLS: ToolInfo[] = [
@@ -190,6 +195,13 @@ export const ALL_TOOLS: ToolInfo[] = [
   // Daily
   { name: "get_daily_note", displayName: "Get Daily Note", description: "Read today's daily note", category: "daily" },
   { name: "create_daily_note", displayName: "Create Daily Note", description: "Create a daily note", category: "daily" },
+  // Calendar
+  { name: "check_calendar_status", displayName: "Calendar Status", description: "Check Full Calendar plugin status", category: "calendar" },
+  { name: "get_events", displayName: "Get Events", description: "Get calendar events for a date/range", category: "calendar" },
+  { name: "create_event", displayName: "Create Event", description: "Create a calendar event", category: "calendar" },
+  { name: "update_event", displayName: "Update Event", description: "Update an event's properties", category: "calendar" },
+  { name: "delete_event", displayName: "Delete Event", description: "Delete a calendar event", category: "calendar" },
+  { name: "get_upcoming_events", displayName: "Upcoming Events", description: "Get events for next N days", category: "calendar" },
 ];
 
 export const TOOL_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(

@@ -1,6 +1,7 @@
 import { requestUrl } from "obsidian";
 import type { AIModel, AIProvider, Attachment, ChatMode, SimpleMessage } from "./types";
 import type { VaultTools } from "./vault-tools";
+import type { CalendarManager } from "./calendar-manager";
 import type { ToolDefinition } from "./tool-definitions";
 
 interface SendMessageOptions {
@@ -11,6 +12,7 @@ interface SendMessageOptions {
   systemPrompt: string;
   conversationHistory: SimpleMessage[];
   vaultTools: VaultTools;
+  calendarManager?: CalendarManager;
   tools?: ToolDefinition[];
   attachments?: Attachment[];
   onText: (text: string) => void;
@@ -147,7 +149,7 @@ export class AIClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const toolResults: any[] = [];
       for (const toolUse of toolUseBlocks) {
-        const result = await this.executeTool(toolUse.name, toolUse.input, vaultTools);
+        const result = await this.executeTool(toolUse.name, toolUse.input, vaultTools, options.calendarManager);
         onToolResult(toolUse.name, result);
         toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
       }
@@ -228,7 +230,7 @@ export class AIClient {
         const fn = toolCall.function;
         const args = JSON.parse(fn.arguments);
         onToolUse(fn.name, args);
-        const result = await this.executeTool(fn.name, args, vaultTools);
+        const result = await this.executeTool(fn.name, args, vaultTools, options.calendarManager);
         onToolResult(fn.name, result);
         messages.push({ role: "tool", tool_call_id: toolCall.id, content: result });
       }
@@ -310,7 +312,7 @@ export class AIClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const functionResponses: any[] = [];
       for (const fc of functionCalls) {
-        const result = await this.executeTool(fc.name, fc.args || {}, vaultTools);
+        const result = await this.executeTool(fc.name, fc.args || {}, vaultTools, options.calendarManager);
         onToolResult(fc.name, result);
         functionResponses.push({
           functionResponse: { name: fc.name, response: { result } },
@@ -381,7 +383,8 @@ export class AIClient {
   private async executeTool(
     name: string,
     input: Record<string, unknown>,
-    vaultTools: VaultTools
+    vaultTools: VaultTools,
+    calendarManager?: CalendarManager
   ): Promise<string> {
     try {
       switch (name) {
@@ -425,6 +428,32 @@ export class AIClient {
           return await vaultTools.getDailyNote(input.date as string);
         case "create_daily_note":
           return await vaultTools.createDailyNote(input.date as string, input.content as string);
+        // Calendar tools
+        case "check_calendar_status":
+          if (!calendarManager) return "Calendar manager not available.";
+          return await calendarManager.checkCalendarStatus();
+        case "get_events":
+          if (!calendarManager) return "Calendar manager not available.";
+          return await calendarManager.getEvents(input.date as string, input.startDate as string, input.endDate as string);
+        case "create_event":
+          if (!calendarManager) return "Calendar manager not available.";
+          return await calendarManager.createEvent({
+            title: input.title as string, date: input.date as string,
+            startTime: input.startTime as string, endTime: input.endTime as string,
+            allDay: input.allDay as boolean, endDate: input.endDate as string,
+            type: input.type as "single" | "recurring" | "rrule",
+            daysOfWeek: input.daysOfWeek as string[], startRecur: input.startRecur as string,
+            endRecur: input.endRecur as string, body: input.body as string,
+          });
+        case "update_event":
+          if (!calendarManager) return "Calendar manager not available.";
+          return await calendarManager.updateEvent(input.path as string, input.properties as Record<string, unknown>);
+        case "delete_event":
+          if (!calendarManager) return "Calendar manager not available.";
+          return await calendarManager.deleteEvent(input.path as string);
+        case "get_upcoming_events":
+          if (!calendarManager) return "Calendar manager not available.";
+          return await calendarManager.getUpcomingEvents((input.days as number) || 7);
         default:
           return `Unknown tool: ${name}`;
       }

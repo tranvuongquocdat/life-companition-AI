@@ -132,7 +132,7 @@ export class VaultTools {
 
   async appendNote(path: string, content: string): Promise<string> {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!file || !(file instanceof TFile)) return `File not found: ${path}`;
+    if (!file || !(file instanceof TFile)) return `File not found: ${path}. Use write_note to create it first, or search_vault to find the correct path.`;
     await this.app.vault.append(file, "\n" + content);
     return `Appended to: ${path}`;
   }
@@ -310,7 +310,7 @@ export class VaultTools {
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, "0");
     const dd = String(date.getDate()).padStart(2, "0");
-    return `Daily Notes/${yyyy}-${mm}-${dd}.md`;
+    return `daily/${yyyy}-${mm}-${dd}.md`;
   }
 
   async getDailyNote(date?: string): Promise<string> {

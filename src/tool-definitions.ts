@@ -42,13 +42,16 @@ export const VAULT_TOOLS: ToolDefinition[] = [
   {
     name: "write_note",
     description:
-      "Create a new note or overwrite an existing note. Creates parent folders automatically. Use [[wiki links]] to link to other notes. IMPORTANT: Always ask the user for confirmation before writing.",
+      "Create a new note or overwrite an existing note. Creates parent folders automatically. " +
+      "Use for notes in vault domains (projects/, areas/, resources/, people/). " +
+      "Do NOT use for calendar events (use create_event) or daily notes (use create_daily_note). " +
+      "File paths: lowercase, hyphenated, no diacritics. IMPORTANT: Always ask user first.",
     input_schema: {
       type: "object",
       properties: {
         path: {
           type: "string",
-          description: "File path relative to vault root, e.g. 'ideas/side-projects/ai-tutor.md'",
+          description: "File path relative to vault root. Use lowercase hyphenated slugs: 'people/family/ha-trang.md', 'areas/career/goals.md'",
         },
         content: {
           type: "string",
@@ -107,7 +110,9 @@ export const KNOWLEDGE_TOOLS: ToolDefinition[] = [
   {
     name: "append_note",
     description:
-      "Append content to the end of an existing note. Use when adding to a note without overwriting. IMPORTANT: Always ask user first.",
+      "Append content to an EXISTING note. WILL FAIL if file doesn't exist — use write_note to create new files. " +
+      "Use for adding updates to existing notes (project updates, new entries). " +
+      "search_vault first to confirm file exists. IMPORTANT: Always ask user first.",
     input_schema: {
       type: "object",
       properties: {
@@ -253,12 +258,103 @@ export const DAILY_TOOLS: ToolDefinition[] = [
   {
     name: "create_daily_note",
     description:
-      "Create a daily note for today or a specific date with optional content. Uses 'Daily Notes/' folder.",
+      "Create a daily note. Path: daily/YYYY-MM-DD.md. " +
+      "Use for daily journal, schedule items without specific time, quick daily logs. " +
+      "Do NOT use for calendar events with specific dates/times — use create_event instead.",
     input_schema: {
       type: "object",
       properties: {
         date: { type: "string", description: "Date in YYYY-MM-DD format. Omit or empty for today." },
         content: { type: "string", description: "Initial content. If empty, creates with a date heading." },
+      },
+      required: [],
+    },
+  },
+];
+
+export const CALENDAR_TOOLS: ToolDefinition[] = [
+  {
+    name: "check_calendar_status",
+    description:
+      "Check if Full Calendar plugin is installed and configured. Returns status and events directory. " +
+      "Use this FIRST before creating calendar events.",
+    input_schema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_events",
+    description:
+      "Get calendar events for a specific date or date range. Reads Full Calendar event files. Use date for a single day, or startDate+endDate for a range.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "Single date in YYYY-MM-DD format" },
+        startDate: { type: "string", description: "Range start date in YYYY-MM-DD format" },
+        endDate: { type: "string", description: "Range end date in YYYY-MM-DD format" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_event",
+    description:
+      "Create a calendar event in the calendar/ directory. This is the ONLY correct way to create events. " +
+      "Do NOT use write_note for events. Events appear in Full Calendar plugin. " +
+      "Supports single and recurring events. IMPORTANT: Always ask user first.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Event title" },
+        date: { type: "string", description: "Event date in YYYY-MM-DD format" },
+        startTime: { type: "string", description: "Start time in HH:MM format (omit for all-day)" },
+        endTime: { type: "string", description: "End time in HH:MM format" },
+        allDay: { type: "boolean", description: "All-day event (default: true if no startTime)" },
+        endDate: { type: "string", description: "End date for multi-day events" },
+        type: { type: "string", description: "Event type: single, recurring, or rrule (default: single)" },
+        daysOfWeek: { type: "array", items: { type: "string" }, description: "For recurring: days [U,M,T,W,R,F,S]" },
+        startRecur: { type: "string", description: "Recurring start date" },
+        endRecur: { type: "string", description: "Recurring end date" },
+        body: { type: "string", description: "Optional markdown body content" },
+      },
+      required: ["title", "date"],
+    },
+  },
+  {
+    name: "update_event",
+    description:
+      "Update an existing calendar event's frontmatter properties. IMPORTANT: Always ask user for confirmation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path of the event to update" },
+        properties: { type: "object", description: 'Key-value pairs to set, e.g. {"startTime": "14:00"}' },
+      },
+      required: ["path", "properties"],
+    },
+  },
+  {
+    name: "delete_event",
+    description:
+      "Delete a calendar event file (moves to trash). IMPORTANT: Always ask user for confirmation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path of the event to delete" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "get_upcoming_events",
+    description:
+      "Get calendar events for the next N days. Great for daily briefings and planning. Shows events grouped by date.",
+    input_schema: {
+      type: "object",
+      properties: {
+        days: { type: "number", description: "Number of days to look ahead (default: 7)" },
       },
       required: [],
     },

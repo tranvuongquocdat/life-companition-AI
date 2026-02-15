@@ -1,6 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting, requestUrl } from "obsidian";
 import type LifeCompanionPlugin from "./main";
 import { ALL_TOOLS, MODEL_GROUPS, getEffectiveModelGroups, type AIModel, type AIProvider } from "./types";
+import { VAULT_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, WEB_TOOLS } from "./tool-definitions";
 import { readClaudeCodeCredentials } from "./auth";
 import { getI18n, type I18n, type Language } from "./i18n";
 
@@ -85,7 +86,24 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
     this.renderToolSection(containerEl, "Graph Tools", ALL_TOOLS.filter((t) => t.category === "graph"));
     this.renderToolSection(containerEl, "Task Tools", ALL_TOOLS.filter((t) => t.category === "task"));
     this.renderToolSection(containerEl, "Daily Notes Tools", ALL_TOOLS.filter((t) => t.category === "daily"));
+    this.renderToolSection(containerEl, "Calendar Tools", ALL_TOOLS.filter((t) => t.category === "calendar"));
     this.renderToolSection(containerEl, "Web Tools", ALL_TOOLS.filter((t) => t.category === "web"));
+
+    // ─── Calendar Settings ──────────────────────────────────
+    containerEl.createEl("h3", { text: "Calendar" });
+
+    new Setting(containerEl)
+      .setName("Events Directory")
+      .setDesc("Fallback events directory if Full Calendar auto-detect fails. Leave empty to auto-detect.")
+      .addText((text) =>
+        text
+          .setPlaceholder("calendar")
+          .setValue(this.plugin.settings.calendarEventsDirectory)
+          .onChange(async (value) => {
+            this.plugin.settings.calendarEventsDirectory = value;
+            await this.plugin.saveSettings();
+          })
+      );
   }
 
   // ─── Collapsible Provider Section ───────────────────────────────
@@ -332,9 +350,16 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
 
   // ─── Tool Section ──────────────────────────────────────────────
 
+  private getToolDetailedDescriptions(): Record<string, string> {
+    const all = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...CALENDAR_TOOLS, ...WEB_TOOLS];
+    return Object.fromEntries(all.map((t) => [t.name, t.description]));
+  }
+
   private renderToolSection(containerEl: HTMLElement, label: string, tools: typeof ALL_TOOLS) {
     const header = containerEl.createDiv({ cls: "lc-tool-group-header" });
     header.createEl("span", { cls: "lc-tool-group-label", text: label });
+
+    const detailedDescs = this.getToolDetailedDescriptions();
 
     for (const tool of tools) {
       const s = new Setting(containerEl)
@@ -354,6 +379,28 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
             });
         });
       s.settingEl.addClass("lc-compact-item");
+
+      // Add info icon inline next to the name
+      const nameEl = s.settingEl.querySelector(".setting-item-name");
+      if (nameEl) {
+        const infoBtn = createEl("span", { cls: "lc-tool-info-btn", text: "!" });
+        nameEl.appendChild(infoBtn);
+
+        // Detail panel goes after the whole setting row
+        const detailEl = createEl("div", {
+          cls: "lc-tool-detail",
+          text: detailedDescs[tool.name] || tool.description,
+        });
+        detailEl.style.display = "none";
+        s.settingEl.after(detailEl);
+
+        infoBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isVisible = detailEl.style.display !== "none";
+          detailEl.style.display = isVisible ? "none" : "block";
+          infoBtn.toggleClass("lc-tool-info-btn-active", !isVisible);
+        });
+      }
     }
   }
 

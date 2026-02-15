@@ -7,7 +7,7 @@ export class ChatHistory {
   private getTodayPath(): string {
     const now = new Date();
     const date = now.toISOString().split("T")[0];
-    return `_chats/${date}.md`;
+    return `system/chats/${date}.md`;
   }
 
   async saveMessage(message: ChatMessage): Promise<void> {

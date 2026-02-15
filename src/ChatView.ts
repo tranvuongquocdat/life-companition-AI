@@ -49,6 +49,14 @@ export class ChatView extends ItemView {
   private previewArea: HTMLElement;
   private fileInput: HTMLInputElement;
 
+  // Calendar Tab
+  private calendarContainer: HTMLElement;
+  private bottomEl: HTMLElement;
+  private calendarMonth: number = new Date().getMonth();
+  private calendarYear: number = new Date().getFullYear();
+  private calendarSelectedDate: string | null = null;
+  private static readonly CALENDAR_TAB_ID = "__calendar__";
+
   private get t(): I18n {
     return getI18n(this.plugin.settings.language);
   }
@@ -110,11 +118,45 @@ export class ChatView extends ItemView {
     // ─── Messages ───────────────────────────────────────────────
     this.messagesContainer = container.createDiv({ cls: "lc-messages" });
 
+    // ─── Calendar View (hidden by default) ────────────────────
+    this.calendarContainer = container.createDiv({ cls: "lc-calendar-view lc-hidden" });
+
     // ─── Bottom ─────────────────────────────────────────────────
     const bottom = container.createDiv({ cls: "lc-bottom" });
+    this.bottomEl = bottom;
 
-    // Toolbar (above input): [attach] [model] [mode] [tokens]
+    // Resize handle (drag to resize input)
+    const resizeHandle = bottom.createDiv({ cls: "lc-resize-handle" });
+    this.setupResizeHandle(resizeHandle);
+
+    // Preview area (above input)
+    this.previewArea = bottom.createDiv({ cls: "lc-preview-area" });
+
+    // Input wrapper (textarea + send button)
+    const inputWrapper = bottom.createDiv({ cls: "lc-input-wrapper" });
+
+    this.inputEl = inputWrapper.createEl("textarea", {
+      cls: "lc-input",
+      placeholder: this.t.sendPlaceholder,
+      attr: { rows: "5" },
+    });
+
+    // Toolbar (below input): [model] [mode] [attach] [tokens]
     const toolbar = bottom.createDiv({ cls: "lc-toolbar" });
+
+    this.modelSelect = toolbar.createEl("select", { cls: "lc-model-select" });
+    this.populateModelSelect();
+    this.modelSelect.addEventListener("change", () => {
+      this.selectedModel = this.modelSelect.value as AIModel;
+      this.conversation.model = this.selectedModel;
+      this.updateTokenCounter();
+    });
+
+    this.modeToggle = toolbar.createEl("button", {
+      cls: "lc-mode-toggle",
+      text: this.t.quickMode,
+    });
+    this.modeToggle.addEventListener("click", () => this.toggleMode());
 
     const attachBtn = toolbar.createEl("button", {
       cls: "lc-attach-btn",
@@ -141,34 +183,8 @@ export class ChatView extends ItemView {
       }
     });
 
-    this.modelSelect = toolbar.createEl("select", { cls: "lc-model-select" });
-    this.populateModelSelect();
-    this.modelSelect.addEventListener("change", () => {
-      this.selectedModel = this.modelSelect.value as AIModel;
-      this.conversation.model = this.selectedModel;
-      this.updateTokenCounter();
-    });
-
-    this.modeToggle = toolbar.createEl("button", {
-      cls: "lc-mode-toggle",
-      text: this.t.quickMode,
-    });
-    this.modeToggle.addEventListener("click", () => this.toggleMode());
-
     this.tokenCounterEl = toolbar.createDiv({ cls: "lc-token-counter" });
     this.updateTokenCounter();
-
-    // Preview area (above input)
-    this.previewArea = bottom.createDiv({ cls: "lc-preview-area" });
-
-    // Input wrapper (textarea + send button)
-    const inputWrapper = bottom.createDiv({ cls: "lc-input-wrapper" });
-
-    this.inputEl = inputWrapper.createEl("textarea", {
-      cls: "lc-input",
-      placeholder: this.t.sendPlaceholder,
-      attr: { rows: "2" },
-    });
 
     this.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -232,6 +248,15 @@ export class ChatView extends ItemView {
       s.activeTabId = this.conversation.id;
       this.plugin.saveData(s);
       this.addAssistantMessage(this.t.greeting);
+    } else if (s.activeTabId === ChatView.CALENDAR_TAB_ID) {
+      // Restore calendar view — load first chat in background
+      const firstTab = s.openTabs[0];
+      const saved = s.savedConversations.find((c) => c.id === firstTab);
+      if (saved) this.loadConversation(saved);
+      this.messagesContainer.addClass("lc-hidden");
+      this.calendarContainer.removeClass("lc-hidden");
+      this.bottomEl.addClass("lc-hidden");
+      this.renderCalendar();
     } else {
       // Restore active tab
       const activeId = s.activeTabId && s.openTabs.includes(s.activeTabId)
@@ -251,6 +276,15 @@ export class ChatView extends ItemView {
     this.tabScrollArea.empty();
     const openTabs = this.plugin.settings.openTabs;
     const activeId = this.plugin.settings.activeTabId;
+
+    // Calendar tab (always first, cannot be closed)
+    const calTab = this.tabScrollArea.createDiv({
+      cls: `lc-tab lc-tab-calendar ${activeId === ChatView.CALENDAR_TAB_ID ? "lc-tab-active" : ""}`,
+    });
+    const calIcon = calTab.createSpan({ cls: "lc-tab-icon" });
+    setIcon(calIcon, "calendar");
+    calTab.createSpan({ cls: "lc-tab-title", text: this.t.calendarTab });
+    calTab.addEventListener("click", () => this.switchToCalendarTab());
 
     for (const tabId of openTabs) {
       const conv = this.plugin.settings.savedConversations.find((c) => c.id === tabId);
@@ -309,12 +343,17 @@ export class ChatView extends ItemView {
   }
 
   private switchToTab(tabId: string) {
-    if (tabId === this.conversation.id) return;
+    if (tabId === this.conversation.id && this.plugin.settings.activeTabId !== ChatView.CALENDAR_TAB_ID) return;
 
     // Save current
     if (this.conversation.messages.length > 0) {
       this.plugin.saveConversation(this.conversation);
     }
+
+    // Restore chat view if coming from calendar
+    this.messagesContainer.removeClass("lc-hidden");
+    this.calendarContainer.addClass("lc-hidden");
+    this.bottomEl.removeClass("lc-hidden");
 
     const saved = this.plugin.settings.savedConversations.find((c) => c.id === tabId);
     if (saved) {
@@ -324,6 +363,299 @@ export class ChatView extends ItemView {
     this.plugin.settings.activeTabId = tabId;
     this.plugin.saveData(this.plugin.settings);
     this.renderTabs();
+  }
+
+  private switchToCalendarTab() {
+    if (this.plugin.settings.activeTabId === ChatView.CALENDAR_TAB_ID) return;
+
+    // Save current conversation
+    if (this.conversation.messages.length > 0) {
+      this.plugin.saveConversation(this.conversation);
+    }
+
+    this.plugin.settings.activeTabId = ChatView.CALENDAR_TAB_ID;
+    this.plugin.saveData(this.plugin.settings);
+
+    // Hide chat, show calendar
+    this.messagesContainer.addClass("lc-hidden");
+    this.calendarContainer.removeClass("lc-hidden");
+    this.bottomEl.addClass("lc-hidden");
+
+    this.renderCalendar();
+    this.renderTabs();
+  }
+
+  // ─── Calendar Rendering ──────────────────────────────────────
+
+  private async renderCalendar() {
+    this.calendarContainer.empty();
+
+    const cm = this.plugin.calendarManager;
+    const installed = cm.isFullCalendarInstalled();
+
+    if (!installed) {
+      const notice = this.calendarContainer.createDiv({ cls: "lc-calendar-notice" });
+      const iconEl = notice.createDiv({ cls: "lc-calendar-notice-icon" });
+      setIcon(iconEl, "calendar-x");
+      notice.createDiv({ cls: "lc-calendar-notice-text", text: this.t.calendarNotInstalled });
+      return;
+    }
+
+    // Navigation bar
+    const nav = this.calendarContainer.createDiv({ cls: "lc-cal-nav" });
+
+    const prevBtn = nav.createEl("button", { cls: "lc-icon-btn" });
+    setIcon(prevBtn, "chevron-left");
+    prevBtn.addEventListener("click", () => {
+      this.calendarMonth--;
+      if (this.calendarMonth < 0) { this.calendarMonth = 11; this.calendarYear--; }
+      this.renderCalendar();
+    });
+
+    const monthLabel = nav.createSpan({ cls: "lc-cal-month-label" });
+    monthLabel.textContent = new Date(this.calendarYear, this.calendarMonth, 1)
+      .toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+    const nextBtn = nav.createEl("button", { cls: "lc-icon-btn" });
+    setIcon(nextBtn, "chevron-right");
+    nextBtn.addEventListener("click", () => {
+      this.calendarMonth++;
+      if (this.calendarMonth > 11) { this.calendarMonth = 0; this.calendarYear++; }
+      this.renderCalendar();
+    });
+
+    const todayBtn = nav.createEl("button", { cls: "lc-cal-today-btn", text: this.t.calendarToday });
+    todayBtn.addEventListener("click", () => {
+      const now = new Date();
+      this.calendarMonth = now.getMonth();
+      this.calendarYear = now.getFullYear();
+      this.calendarSelectedDate = now.toISOString().split("T")[0];
+      this.renderCalendar();
+    });
+
+    // Day-of-week header
+    const grid = this.calendarContainer.createDiv({ cls: "lc-cal-grid" });
+    for (const dow of ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) {
+      grid.createDiv({ cls: "lc-cal-dow", text: dow });
+    }
+
+    // Get events for this month
+    let eventsMap = new Map<string, any[]>();
+    try {
+      eventsMap = await cm.getEventsForMonth(this.calendarYear, this.calendarMonth);
+    } catch {
+      // No events directory configured
+    }
+
+    // Calculate grid
+    const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
+    const startDow = firstDay.getDay();
+    const daysInMonth = new Date(this.calendarYear, this.calendarMonth + 1, 0).getDate();
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    // Empty cells before first day
+    for (let i = 0; i < startDow; i++) {
+      grid.createDiv({ cls: "lc-cal-cell lc-cal-empty" });
+    }
+
+    // Day cells
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const dayEvents = eventsMap.get(dateStr) || [];
+      const isToday = dateStr === todayStr;
+      const isSelected = dateStr === this.calendarSelectedDate;
+
+      const cell = grid.createDiv({
+        cls: `lc-cal-cell${isToday ? " lc-cal-today" : ""}${isSelected ? " lc-cal-selected" : ""}${dayEvents.length > 0 ? " lc-cal-has-events" : ""}`,
+      });
+
+      cell.createDiv({ cls: "lc-cal-day-num", text: String(day) });
+
+      if (dayEvents.length > 0) {
+        const dots = cell.createDiv({ cls: "lc-cal-dots" });
+        const showCount = Math.min(dayEvents.length, 3);
+        for (let i = 0; i < showCount; i++) {
+          dots.createSpan({ cls: "lc-cal-dot" });
+        }
+        if (dayEvents.length > 3) {
+          dots.createSpan({ cls: "lc-cal-dot-more", text: `+${dayEvents.length - 3}` });
+        }
+      }
+
+      cell.addEventListener("click", () => {
+        this.calendarSelectedDate = dateStr;
+        this.renderCalendar();
+      });
+    }
+
+    // Selected day event list
+    if (this.calendarSelectedDate) {
+      const selectedEvents = eventsMap.get(this.calendarSelectedDate) || [];
+      const dateLabel = new Date(this.calendarSelectedDate + "T00:00:00")
+        .toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+      const eventList = this.calendarContainer.createDiv({ cls: "lc-cal-event-list" });
+
+      // Header with add button
+      const headerRow = eventList.createDiv({ cls: "lc-cal-event-list-header" });
+      headerRow.createSpan({ text: this.t.calendarEventsFor(dateLabel) });
+      const addBtn = headerRow.createEl("button", { cls: "lc-cal-add-btn", attr: { "aria-label": this.t.calendarAddEvent } });
+      setIcon(addBtn, "plus");
+      addBtn.addEventListener("click", () => {
+        this.renderEventForm(eventList, this.calendarSelectedDate!);
+      });
+
+      if (selectedEvents.length === 0) {
+        eventList.createDiv({ cls: "lc-cal-no-events", text: this.t.calendarNoEvents });
+      } else {
+        for (const event of selectedEvents) {
+          const item = eventList.createDiv({ cls: "lc-cal-event-item" });
+          const time = event.allDay
+            ? "All day"
+            : `${event.startTime || ""}${event.endTime ? " - " + event.endTime : ""}`;
+
+          if (time) item.createSpan({ cls: "lc-cal-event-time", text: time });
+          item.createSpan({ cls: "lc-cal-event-title", text: event.title });
+
+          if (event.completed) item.addClass("lc-cal-event-completed");
+
+          // Action buttons (edit + delete)
+          const actions = item.createDiv({ cls: "lc-cal-event-actions" });
+
+          const editBtn = actions.createEl("button", { cls: "lc-cal-action-btn", attr: { "aria-label": this.t.calendarEditEvent } });
+          setIcon(editBtn, "pencil");
+          editBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.renderEventForm(eventList, this.calendarSelectedDate!, event);
+          });
+
+          const deleteBtn = actions.createEl("button", { cls: "lc-cal-action-btn lc-cal-delete-btn", attr: { "aria-label": this.t.calendarDeleteConfirm } });
+          setIcon(deleteBtn, "trash-2");
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.deleteCalendarEvent(event.filePath);
+          });
+
+          item.addEventListener("click", () => {
+            this.app.workspace.openLinkText(event.filePath, "", "tab");
+          });
+        }
+      }
+    }
+  }
+
+  private async deleteCalendarEvent(filePath: string) {
+    if (!confirm(this.t.calendarDeleteConfirm)) return;
+    const cm = this.plugin.calendarManager;
+    await cm.deleteEvent(filePath);
+    new Notice(this.t.calendarEventDeleted);
+    this.renderCalendar();
+  }
+
+  private renderEventForm(
+    container: HTMLElement,
+    date: string,
+    existing?: { filePath: string; title: string; startTime?: string; endTime?: string; allDay?: boolean },
+  ) {
+    // Remove any existing form
+    container.querySelector(".lc-cal-event-form")?.remove();
+
+    const isEdit = !!existing;
+    const form = container.createDiv({ cls: "lc-cal-event-form" });
+
+    // Title
+    const titleRow = form.createDiv({ cls: "lc-cal-form-row" });
+    titleRow.createEl("label", { text: this.t.calendarEventTitle });
+    const titleInput = titleRow.createEl("input", {
+      cls: "lc-cal-form-input",
+      attr: { type: "text", placeholder: this.t.calendarEventTitle },
+    });
+    if (existing) titleInput.value = existing.title;
+
+    // Date
+    const dateRow = form.createDiv({ cls: "lc-cal-form-row" });
+    dateRow.createEl("label", { text: "Date" });
+    const dateInput = dateRow.createEl("input", {
+      cls: "lc-cal-form-input",
+      attr: { type: "date" },
+    });
+    dateInput.value = date;
+
+    // All day toggle
+    const allDayRow = form.createDiv({ cls: "lc-cal-form-row lc-cal-form-row-inline" });
+    const allDayLabel = allDayRow.createEl("label", { text: this.t.calendarAllDay });
+    const allDayCheck = allDayRow.createEl("input", { attr: { type: "checkbox" } });
+    allDayCheck.checked = existing ? (existing.allDay !== false) : true;
+    allDayLabel.prepend(allDayCheck);
+
+    // Time row
+    const timeRow = form.createDiv({ cls: "lc-cal-form-row lc-cal-form-time-row" });
+    const startInput = timeRow.createEl("input", {
+      cls: "lc-cal-form-input lc-cal-form-time",
+      attr: { type: "time" },
+    });
+    timeRow.createSpan({ text: "—" });
+    const endInput = timeRow.createEl("input", {
+      cls: "lc-cal-form-input lc-cal-form-time",
+      attr: { type: "time" },
+    });
+    if (existing?.startTime) startInput.value = existing.startTime;
+    if (existing?.endTime) endInput.value = existing.endTime;
+
+    const updateTimeVisibility = () => {
+      timeRow.style.display = allDayCheck.checked ? "none" : "flex";
+    };
+    allDayCheck.addEventListener("change", updateTimeVisibility);
+    updateTimeVisibility();
+
+    // Buttons
+    const btnRow = form.createDiv({ cls: "lc-cal-form-buttons" });
+    const cancelBtn = btnRow.createEl("button", { cls: "lc-cal-form-cancel", text: this.t.calendarCancel });
+    const saveBtn = btnRow.createEl("button", { cls: "lc-cal-form-save", text: this.t.calendarSave });
+
+    cancelBtn.addEventListener("click", () => form.remove());
+
+    saveBtn.addEventListener("click", async () => {
+      const title = titleInput.value.trim();
+      if (!title) {
+        titleInput.addClass("lc-cal-form-error");
+        titleInput.focus();
+        return;
+      }
+
+      const cm = this.plugin.calendarManager;
+      const eventDate = dateInput.value;
+      const isAllDay = allDayCheck.checked;
+      const startTime = isAllDay ? undefined : startInput.value || undefined;
+      const endTime = isAllDay ? undefined : endInput.value || undefined;
+
+      if (isEdit && existing) {
+        // Update existing event
+        const props: Record<string, unknown> = { title };
+        if (eventDate !== date) props.date = eventDate;
+        props.allDay = isAllDay;
+        if (startTime) props.startTime = startTime;
+        else props.startTime = null;
+        if (endTime) props.endTime = endTime;
+        else props.endTime = null;
+        await cm.updateEvent(existing.filePath, props);
+        new Notice(this.t.calendarEventUpdated);
+      } else {
+        // Create new event
+        await cm.createEvent({
+          title,
+          date: eventDate,
+          allDay: isAllDay,
+          startTime,
+          endTime,
+        });
+        new Notice(this.t.calendarEventCreated);
+      }
+
+      this.renderCalendar();
+    });
+
+    titleInput.focus();
   }
 
   private closeTab(tabId: string) {
@@ -388,11 +720,40 @@ export class ChatView extends ItemView {
     this.modelSelect.value = this.selectedModel;
   }
 
+  // ─── Resize Handle ──────────────────────────────────────────
+
+  private setupResizeHandle(handle: HTMLElement) {
+    let startY = 0;
+    let startH = 0;
+
+    const onMouseMove = (e: MouseEvent) => {
+      // Dragging up = smaller Y = increase height
+      const delta = startY - e.clientY;
+      const newH = Math.max(28, Math.min(startH + delta, this.contentEl.clientHeight * 0.6));
+      this.inputEl.style.height = newH + "px";
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.removeClass("lc-resizing");
+    };
+
+    handle.addEventListener("mousedown", (e: MouseEvent) => {
+      e.preventDefault();
+      startY = e.clientY;
+      startH = this.inputEl.offsetHeight;
+      document.body.addClass("lc-resizing");
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+  }
+
   // ─── Auto-resize Textarea ─────────────────────────────────────
 
   private autoResizeInput() {
     this.inputEl.style.height = "auto";
-    const maxH = this.contentEl.clientHeight * 0.3;
+    const maxH = this.contentEl.clientHeight * 0.6;
     this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, maxH) + "px";
   }
 
@@ -448,6 +809,18 @@ export class ChatView extends ItemView {
         return `Reading daily note${input.date ? " for " + input.date : ""}`;
       case "create_daily_note":
         return `Creating daily note${input.date ? " for " + input.date : ""}`;
+      case "check_calendar_status":
+        return "Checking calendar status";
+      case "get_events":
+        return `Getting events${input.date ? " for " + input.date : ""}${input.startDate ? " from " + input.startDate + " to " + input.endDate : ""}`;
+      case "create_event":
+        return `Creating event "${input.title}" on ${input.date}`;
+      case "update_event":
+        return `Updating event ${input.path}`;
+      case "delete_event":
+        return `Deleting event ${input.path}`;
+      case "get_upcoming_events":
+        return `Getting upcoming events (${input.days || 7} days)`;
       default:
         return `Using ${name}`;
     }
@@ -474,6 +847,12 @@ export class ChatView extends ItemView {
     toggle_task: "Toggled task",
     get_daily_note: "Read daily note",
     create_daily_note: "Created daily note",
+    check_calendar_status: "Checked calendar",
+    get_events: "Got events",
+    create_event: "Created event",
+    update_event: "Updated event",
+    delete_event: "Deleted event",
+    get_upcoming_events: "Got upcoming events",
   };
 
   startThinking() {
@@ -505,6 +884,10 @@ export class ChatView extends ItemView {
     item.createSpan({ cls: "lc-tool-spinner" });
     item.createSpan({ cls: "lc-thinking-tool-text", text: desc });
 
+    // Update header label to show current tool activity
+    const label = this.thinkingEl?.querySelector(".lc-thinking-label");
+    if (label) label.textContent = desc;
+
     this.thinkingToolMap.set(name, item);
     this.scrollToBottom();
   }
@@ -523,14 +906,16 @@ export class ChatView extends ItemView {
       spinner.replaceWith(check);
     }
 
-    const nameEl = item.querySelector(".lc-thinking-tool-text");
-    const doneName = ChatView.TOOL_DONE_NAMES[name] || name;
-    if (nameEl) nameEl.textContent = doneName;
-
+    // Keep original description, just append result preview
     if (result) {
-      const preview = result.length > 60 ? result.slice(0, 60) + "..." : result;
+      const preview = result.length > 80 ? result.slice(0, 80) + "..." : result;
       item.createSpan({ cls: "lc-thinking-tool-preview", text: ` — ${preview}` });
     }
+
+    // Update header label to show completed action
+    const label = this.thinkingEl?.querySelector(".lc-thinking-label");
+    const doneName = ChatView.TOOL_DONE_NAMES[name] || name;
+    if (label) label.textContent = doneName;
   }
 
   stopThinking() {
@@ -556,14 +941,11 @@ export class ChatView extends ItemView {
       label.textContent = this.t.usedTools(toolCount);
     }
 
-    // Add expand arrow hint
+    // Add expand arrow — body stays open so user can see what was done
     const arrow = document.createElement("span");
     arrow.className = "lc-thinking-arrow";
-    arrow.textContent = "\u25B8";
+    arrow.textContent = "\u25BE"; // down arrow = expanded
     this.thinkingEl.querySelector(".lc-thinking-header")?.prepend(arrow);
-
-    // Collapse body
-    this.thinkingBody?.addClass("lc-collapsed");
   }
 
   // ─── History Panel ─────────────────────────────────────────────
@@ -795,12 +1177,22 @@ export class ChatView extends ItemView {
   async renderMarkdown(el: HTMLElement, text: string) {
     el.empty();
     await MarkdownRenderer.render(this.app, text, el, "", this);
-    // Make [[wiki links]] clickable — open the referenced note
+    // Make [[wiki links]] clickable — open or reveal the referenced note
     el.querySelectorAll("a.internal-link").forEach((linkEl) => {
       linkEl.addEventListener("click", (e) => {
         e.preventDefault();
         const href = linkEl.getAttribute("href");
-        if (href) this.app.workspace.openLinkText(href, "", false);
+        if (!href) return;
+        // Check if note is already open in a tab
+        const existing = this.app.workspace.getLeavesOfType("markdown").find((leaf) => {
+          const file = (leaf.view as any)?.file;
+          return file && (file.path === href || file.path === href + ".md" || file.basename === href);
+        });
+        if (existing) {
+          this.app.workspace.setActiveLeaf(existing, { focus: true });
+        } else {
+          this.app.workspace.openLinkText(href, "", "tab");
+        }
       });
     });
   }

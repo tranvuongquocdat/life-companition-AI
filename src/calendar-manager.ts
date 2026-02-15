@@ -1,0 +1,316 @@
+import { App, TFile, TFolder } from "obsidian";
+
+// ─── Event types matching Full Calendar frontmatter schema ───
+
+export interface CalendarEvent {
+  filePath: string;
+  title: string;
+  type: "single" | "recurring" | "rrule";
+  date?: string;
+  endDate?: string;
+  allDay?: boolean;
+  startTime?: string;
+  endTime?: string;
+  completed?: boolean;
+  daysOfWeek?: string[];
+  startRecur?: string;
+  endRecur?: string;
+  rrule?: string;
+  startDate?: string;
+  skipDates?: string[];
+}
+
+const DOW_MAP: Record<string, number> = {
+  U: 0, M: 1, T: 2, W: 3, R: 4, F: 5, S: 6,
+};
+
+export class CalendarManager {
+  constructor(
+    private app: App,
+    private getSettingsDir?: () => string,
+  ) {}
+
+  // ─── Detection ──────────────────────────────────────────
+
+  isFullCalendarInstalled(): boolean {
+    return (this.app as any).plugins?.enabledPlugins?.has("obsidian-full-calendar") ?? false;
+  }
+
+  async getEventsDirectory(): Promise<string | null> {
+    try {
+      const configPath = ".obsidian/plugins/obsidian-full-calendar/data.json";
+      const content = await this.app.vault.adapter.read(configPath);
+      const data = JSON.parse(content);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const localSource = data.calendarSources?.find((s: any) => s.type === "local");
+      if (localSource?.directory) return localSource.directory;
+    } catch {
+      // Config not found or unreadable
+    }
+    return null;
+  }
+
+  private async getEventsDir(): Promise<string> {
+    const dir = await this.getEventsDirectory();
+    if (dir) return dir;
+    const fallback = this.getSettingsDir?.();
+    if (fallback) return fallback;
+    return "calendar";
+  }
+
+  // ─── Check Status ───────────────────────────────────────
+
+  async checkCalendarStatus(): Promise<string> {
+    const installed = this.isFullCalendarInstalled();
+    if (!installed) {
+      return "Full Calendar plugin is not installed or not enabled. " +
+        "Install it from Obsidian Community Plugins: search 'Full Calendar'. " +
+        "Once installed, create a local calendar source with an events directory.";
+    }
+    const dir = await this.getEventsDirectory();
+    if (dir) {
+      return `Full Calendar is installed. Events directory: ${dir}`;
+    }
+    return "Full Calendar is installed but no local calendar source found. " +
+      "Configure a local calendar in Full Calendar settings.";
+  }
+
+  // ─── Parse Events ───────────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private parseEvent(file: TFile, fm: Record<string, any>): CalendarEvent {
+    return {
+      filePath: file.path,
+      title: fm.title || file.basename,
+      type: fm.type || "single",
+      date: fm.date,
+      endDate: fm.endDate,
+      allDay: fm.allDay,
+      startTime: fm.startTime,
+      endTime: fm.endTime,
+      completed: fm.completed,
+      daysOfWeek: fm.daysOfWeek,
+      startRecur: fm.startRecur,
+      endRecur: fm.endRecur,
+      rrule: fm.rrule,
+      startDate: fm.startDate,
+      skipDates: fm.skipDates,
+    };
+  }
+
+  private async getAllEvents(): Promise<CalendarEvent[]> {
+    const dir = await this.getEventsDir();
+    const events: CalendarEvent[] = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (!file.path.startsWith(dir)) continue;
+      const cache = this.app.metadataCache.getFileCache(file);
+      const fm = cache?.frontmatter;
+      if (fm && fm.title) {
+        events.push(this.parseEvent(file, fm));
+      }
+    }
+    return events;
+  }
+
+  // ─── Date Matching ──────────────────────────────────────
+
+  private eventOccursOnDate(event: CalendarEvent, dateStr: string): boolean {
+    const date = new Date(dateStr + "T00:00:00");
+
+    if (event.type === "single") {
+      if (!event.date) return false;
+      if (event.endDate) return dateStr >= event.date && dateStr <= event.endDate;
+      return event.date === dateStr;
+    }
+
+    if (event.type === "recurring") {
+      if (event.startRecur && dateStr < event.startRecur) return false;
+      if (event.endRecur && dateStr > event.endRecur) return false;
+      if (!event.daysOfWeek) return false;
+      const dow = date.getDay();
+      return event.daysOfWeek.some((d) => DOW_MAP[d] === dow);
+    }
+
+    if (event.type === "rrule") {
+      if (event.startDate && dateStr < event.startDate) return false;
+      if (event.skipDates?.includes(dateStr)) return false;
+      return true; // Simplified — full RRULE parsing not implemented
+    }
+
+    return false;
+  }
+
+  // ─── Tool: get_events ───────────────────────────────────
+
+  async getEvents(date?: string, startDate?: string, endDate?: string): Promise<string> {
+    const events = await this.getAllEvents();
+    let filtered: CalendarEvent[];
+
+    if (date) {
+      filtered = events.filter((e) => this.eventOccursOnDate(e, date));
+    } else if (startDate && endDate) {
+      filtered = [];
+      const cur = new Date(startDate + "T00:00:00");
+      const end = new Date(endDate + "T00:00:00");
+      const seen = new Set<string>();
+      while (cur <= end) {
+        const ds = cur.toISOString().split("T")[0];
+        for (const e of events) {
+          if (this.eventOccursOnDate(e, ds) && !seen.has(e.filePath)) {
+            seen.add(e.filePath);
+            filtered.push(e);
+          }
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    } else {
+      const today = new Date().toISOString().split("T")[0];
+      filtered = events.filter((e) => this.eventOccursOnDate(e, today));
+    }
+
+    if (filtered.length === 0) return "No events found for the specified date/range.";
+
+    return filtered.map((e) => {
+      const time = e.allDay ? "All day" : `${e.startTime || "?"}${e.endTime ? " - " + e.endTime : ""}`;
+      const status = e.completed ? " [completed]" : "";
+      return `- **${e.title}** (${time})${status} — ${e.filePath}`;
+    }).join("\n");
+  }
+
+  // ─── Tool: get_upcoming_events ──────────────────────────
+
+  async getUpcomingEvents(days: number = 7): Promise<string> {
+    const today = new Date();
+    const events = await this.getAllEvents();
+    const grouped: Record<string, CalendarEvent[]> = {};
+
+    for (let i = 0; i < days; i++) {
+      const cur = new Date(today);
+      cur.setDate(cur.getDate() + i);
+      const ds = cur.toISOString().split("T")[0];
+      for (const event of events) {
+        if (this.eventOccursOnDate(event, ds)) {
+          if (!grouped[ds]) grouped[ds] = [];
+          if (!grouped[ds].some((e) => e.filePath === event.filePath)) {
+            grouped[ds].push(event);
+          }
+        }
+      }
+    }
+
+    const entries = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+    if (entries.length === 0) return `No events in the next ${days} days.`;
+
+    return entries.map(([date, evts]) => {
+      const label = new Date(date + "T00:00:00").toLocaleDateString("en-US", {
+        weekday: "short", month: "short", day: "numeric",
+      });
+      const lines = evts.map((e) => {
+        const time = e.allDay ? "all day" : `${e.startTime || "?"}${e.endTime ? "-" + e.endTime : ""}`;
+        return `  - ${e.title} (${time})`;
+      }).join("\n");
+      return `**${label} (${date})**\n${lines}`;
+    }).join("\n\n");
+  }
+
+  // ─── Tool: create_event ─────────────────────────────────
+
+  async createEvent(params: {
+    title: string;
+    date: string;
+    startTime?: string;
+    endTime?: string;
+    allDay?: boolean;
+    endDate?: string;
+    type?: "single" | "recurring" | "rrule";
+    daysOfWeek?: string[];
+    startRecur?: string;
+    endRecur?: string;
+    body?: string;
+  }): Promise<string> {
+    const dir = await this.getEventsDir();
+    const slug = params.title.replace(/[/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").trim();
+    const fileName = `${params.date} ${slug}.md`;
+    const filePath = `${dir}/${fileName}`;
+
+    const existing = this.app.vault.getAbstractFileByPath(filePath);
+    if (existing) return `Event file already exists: ${filePath}. Use update_event instead.`;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fm: Record<string, any> = { title: params.title, type: params.type || "single" };
+
+    if (fm.type === "single") {
+      fm.date = params.date;
+      if (params.endDate) fm.endDate = params.endDate;
+      fm.allDay = params.allDay ?? !params.startTime;
+      if (params.startTime) fm.startTime = params.startTime;
+      if (params.endTime) fm.endTime = params.endTime;
+    } else if (fm.type === "recurring") {
+      if (params.daysOfWeek) fm.daysOfWeek = params.daysOfWeek;
+      if (params.startRecur) fm.startRecur = params.startRecur;
+      if (params.endRecur) fm.endRecur = params.endRecur;
+      if (params.startTime) fm.startTime = params.startTime;
+      if (params.endTime) fm.endTime = params.endTime;
+    }
+
+    const yamlLines = ["---"];
+    for (const [key, value] of Object.entries(fm)) {
+      if (Array.isArray(value)) {
+        yamlLines.push(`${key}: [${value.join(",")}]`);
+      } else if (typeof value === "boolean") {
+        yamlLines.push(`${key}: ${value}`);
+      } else {
+        yamlLines.push(`${key}: "${value}"`);
+      }
+    }
+    yamlLines.push("---");
+
+    const content = yamlLines.join("\n") + "\n\n" + (params.body || "");
+
+    const folder = this.app.vault.getAbstractFileByPath(dir);
+    if (!folder) await this.app.vault.createFolder(dir);
+
+    await this.app.vault.create(filePath, content);
+    return `Created event: ${filePath}`;
+  }
+
+  // ─── Tool: update_event ─────────────────────────────────
+
+  async updateEvent(path: string, properties: Record<string, unknown>): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!file || !(file instanceof TFile)) return `Event file not found: ${path}`;
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      for (const [key, value] of Object.entries(properties)) {
+        fm[key] = value;
+      }
+    });
+    return `Updated event: ${path}`;
+  }
+
+  // ─── Tool: delete_event ─────────────────────────────────
+
+  async deleteEvent(path: string): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!file || !(file instanceof TFile)) return `Event file not found: ${path}`;
+    await this.app.vault.trash(file, true);
+    return `Deleted event: ${path}`;
+  }
+
+  // ─── UI: get events for a month ─────────────────────────
+
+  async getEventsForMonth(year: number, month: number): Promise<Map<string, CalendarEvent[]>> {
+    const events = await this.getAllEvents();
+    const map = new Map<string, CalendarEvent[]>();
+
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    for (let day = 1; day <= lastDay; day++) {
+      const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const dayEvents: CalendarEvent[] = [];
+      for (const event of events) {
+        if (this.eventOccursOnDate(event, ds)) dayEvents.push(event);
+      }
+      if (dayEvents.length > 0) map.set(ds, dayEvents);
+    }
+    return map;
+  }
+}

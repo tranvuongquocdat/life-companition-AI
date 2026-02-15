@@ -19,11 +19,12 @@ import {
   type SavedConversation,
 } from "./types";
 import { VaultTools } from "./vault-tools";
-import { VAULT_TOOLS, WEB_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, type ToolDefinition } from "./tool-definitions";
+import { CalendarManager } from "./calendar-manager";
+import { VAULT_TOOLS, WEB_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, type ToolDefinition } from "./tool-definitions";
 import { getI18n } from "./i18n";
 
 function selectTools(message: string, mode: ChatMode, enabledTools: string[]): ToolDefinition[] {
-  const ALL = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...WEB_TOOLS];
+  const ALL = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...CALENDAR_TOOLS, ...WEB_TOOLS];
   const filterEnabled = (defs: ToolDefinition[]) =>
     defs.filter((t) => enabledTools.includes(t.name));
 
@@ -32,7 +33,7 @@ function selectTools(message: string, mode: ChatMode, enabledTools: string[]): T
 
   // Quick mode: include all non-web tools,
   // only add web tools if message explicitly needs them
-  const tools: ToolDefinition[] = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS];
+  const tools: ToolDefinition[] = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...CALENDAR_TOOLS];
 
   const webHint = /\b(web|google|tra cứu|research|internet|url|http|website|trang web|tìm trên mạng|online|fetch|search online|search web)\b/i;
   if (webHint.test(message)) tools.push(...WEB_TOOLS);
@@ -44,12 +45,14 @@ export default class LifeCompanionPlugin extends Plugin {
   settings: LifeCompanionSettings;
   aiClient: AIClient;
   vaultTools: VaultTools;
+  calendarManager: CalendarManager;
   profileManager: ProfileManager;
 
   async onload() {
     await this.loadSettings();
 
     this.vaultTools = new VaultTools(this.app);
+    this.calendarManager = new CalendarManager(this.app, () => this.settings.calendarEventsDirectory);
     this.profileManager = new ProfileManager(this.app);
     this.initAIClient();
 
@@ -214,6 +217,7 @@ export default class LifeCompanionPlugin extends Plugin {
         systemPrompt,
         conversationHistory: conversation.history,
         vaultTools: this.vaultTools,
+        calendarManager: this.calendarManager,
         tools,
         attachments: attachments || [],
         onText: (chunk) => {

@@ -62,6 +62,23 @@ export interface I18n {
 
   // Tabs
   maxTabs: string;
+
+  // Calendar
+  calendarTab: string;
+  calendarNotInstalled: string;
+  calendarToday: string;
+  calendarNoEvents: string;
+  calendarEventsFor: (date: string) => string;
+  calendarAddEvent: string;
+  calendarEditEvent: string;
+  calendarDeleteConfirm: string;
+  calendarEventTitle: string;
+  calendarAllDay: string;
+  calendarSave: string;
+  calendarCancel: string;
+  calendarEventCreated: string;
+  calendarEventUpdated: string;
+  calendarEventDeleted: string;
 }
 
 const en: I18n = {
@@ -118,6 +135,21 @@ const en: I18n = {
   unsupportedFile: (ext) => `Unsupported file type: .${ext}`,
   attachFile: "Attach file",
   maxTabs: "Maximum 8 tabs",
+  calendarTab: "Calendar",
+  calendarNotInstalled: "Full Calendar plugin is not installed. Install it from Community Plugins to use the calendar view.",
+  calendarToday: "Today",
+  calendarNoEvents: "No events",
+  calendarEventsFor: (date) => `Events for ${date}`,
+  calendarAddEvent: "Add Event",
+  calendarEditEvent: "Edit Event",
+  calendarDeleteConfirm: "Delete this event?",
+  calendarEventTitle: "Title",
+  calendarAllDay: "All day",
+  calendarSave: "Save",
+  calendarCancel: "Cancel",
+  calendarEventCreated: "Event created!",
+  calendarEventUpdated: "Event updated!",
+  calendarEventDeleted: "Event deleted!",
 };
 
 const vi: I18n = {
@@ -174,6 +206,21 @@ const vi: I18n = {
   unsupportedFile: (ext) => `Loại file không hỗ trợ: .${ext}`,
   attachFile: "Đính kèm file",
   maxTabs: "Tối đa 8 tab",
+  calendarTab: "Lịch",
+  calendarNotInstalled: "Plugin Full Calendar chưa được cài đặt. Cài từ Community Plugins để dùng chế độ xem lịch.",
+  calendarToday: "Hôm nay",
+  calendarNoEvents: "Không có sự kiện",
+  calendarEventsFor: (date) => `Sự kiện ngày ${date}`,
+  calendarAddEvent: "Thêm sự kiện",
+  calendarEditEvent: "Sửa sự kiện",
+  calendarDeleteConfirm: "Xóa sự kiện này?",
+  calendarEventTitle: "Tiêu đề",
+  calendarAllDay: "Cả ngày",
+  calendarSave: "Lưu",
+  calendarCancel: "Hủy",
+  calendarEventCreated: "Đã tạo sự kiện!",
+  calendarEventUpdated: "Đã cập nhật sự kiện!",
+  calendarEventDeleted: "Đã xóa sự kiện!",
 };
 
 const STRINGS: Record<Language, I18n> = { en, vi };
