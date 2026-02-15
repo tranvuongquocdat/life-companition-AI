@@ -86,6 +86,11 @@ export interface I18n {
   calendarRepeatDaily: string;
   calendarRepeatWeekly: string;
   calendarRepeatMonthly: string;
+  calendarRepeatCustom: string;
+  calendarRepeatEvery: string;
+  calendarRepeatDays: string;
+  calendarRepeatWeeks: string;
+  calendarRepeatMonths: string;
   calendarRepeatEnds: string;
   calendarRepeatNever: string;
   calendarRepeatUntil: string;
@@ -172,6 +177,11 @@ const en: I18n = {
   calendarRepeatDaily: "Every day",
   calendarRepeatWeekly: "Every week",
   calendarRepeatMonthly: "Every month",
+  calendarRepeatCustom: "Custom...",
+  calendarRepeatEvery: "Every",
+  calendarRepeatDays: "days",
+  calendarRepeatWeeks: "weeks",
+  calendarRepeatMonths: "months",
   calendarRepeatEnds: "Ends",
   calendarRepeatNever: "Never",
   calendarRepeatUntil: "On date",
@@ -258,6 +268,11 @@ const vi: I18n = {
   calendarRepeatDaily: "Hàng ngày",
   calendarRepeatWeekly: "Hàng tuần",
   calendarRepeatMonthly: "Hàng tháng",
+  calendarRepeatCustom: "Tùy chỉnh...",
+  calendarRepeatEvery: "Mỗi",
+  calendarRepeatDays: "ngày",
+  calendarRepeatWeeks: "tuần",
+  calendarRepeatMonths: "tháng",
   calendarRepeatEnds: "Kết thúc",
   calendarRepeatNever: "Không bao giờ",
   calendarRepeatUntil: "Đến ngày",

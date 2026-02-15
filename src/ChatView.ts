@@ -636,18 +636,46 @@ export class ChatView extends ItemView {
       { value: "daily", label: this.t.calendarRepeatDaily },
       { value: "weekly", label: this.t.calendarRepeatWeekly },
       { value: "monthly", label: this.t.calendarRepeatMonthly },
+      { value: "custom", label: this.t.calendarRepeatCustom },
     ];
     for (const opt of repeatOptions) {
       repeatSelect.createEl("option", { value: opt.value, text: opt.label });
     }
 
+    // ── Custom repeat controls (Every N days/weeks/months) ──
+    const customRow = form.createDiv({ cls: "lc-cal-form-row lc-cal-form-custom-row" });
+    customRow.createSpan({ text: this.t.calendarRepeatEvery });
+    const intervalInput = customRow.createEl("input", {
+      cls: "lc-cal-form-input lc-cal-form-interval",
+      attr: { type: "number", min: "1", max: "99", value: "1" },
+    });
+    const freqSelect = customRow.createEl("select", { cls: "lc-cal-form-input lc-cal-form-freq-select" });
+    freqSelect.createEl("option", { value: "days", text: this.t.calendarRepeatDays });
+    freqSelect.createEl("option", { value: "weeks", text: this.t.calendarRepeatWeeks });
+    freqSelect.createEl("option", { value: "months", text: this.t.calendarRepeatMonths });
+
     // Determine initial repeat value from existing event
+    let isCustom = false;
     if (existing?.type === "recurring" && existing.daysOfWeek) {
-      // Check if all 7 days = daily
       const allDays = existing.daysOfWeek.length === 7;
       repeatSelect.value = allDays ? "daily" : "weekly";
-    } else if (existing?.type === "rrule") {
-      repeatSelect.value = "monthly";
+    } else if (existing?.type === "rrule" && existing.rrule) {
+      // Parse rrule to determine if it's a simple monthly or custom
+      const intervalMatch = existing.rrule.match(/INTERVAL=(\d+)/);
+      const interval = intervalMatch ? parseInt(intervalMatch[1], 10) : 1;
+      const freqMatch = existing.rrule.match(/FREQ=(DAILY|WEEKLY|MONTHLY)/);
+      const freq = freqMatch ? freqMatch[1] : "MONTHLY";
+
+      if (interval === 1 && freq === "MONTHLY") {
+        repeatSelect.value = "monthly";
+      } else {
+        isCustom = true;
+        repeatSelect.value = "custom";
+        intervalInput.value = String(interval);
+        if (freq === "DAILY") freqSelect.value = "days";
+        else if (freq === "WEEKLY") freqSelect.value = "weeks";
+        else freqSelect.value = "months";
+      }
     } else {
       repeatSelect.value = "none";
     }
@@ -662,7 +690,17 @@ export class ChatView extends ItemView {
     if (existing?.daysOfWeek) {
       for (const d of existing.daysOfWeek) {
         if (typeof d === "number") selectedDays.add(d);
-        else if (DOW_LETTER_TO_NUM[d] !== undefined) selectedDays.add(DOW_LETTER_TO_NUM[d]);
+        else if (DOW_LETTER_TO_NUM[d as string] !== undefined) selectedDays.add(DOW_LETTER_TO_NUM[d as string]);
+      }
+    }
+    // Also parse BYDAY from rrule for custom weekly
+    if (isCustom && existing?.rrule) {
+      const bdayMatch = existing.rrule.match(/BYDAY=([A-Z,]+)/);
+      if (bdayMatch) {
+        const rruleDayMap: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+        for (const d of bdayMatch[1].split(",")) {
+          if (rruleDayMap[d] !== undefined) selectedDays.add(rruleDayMap[d]);
+        }
       }
     }
 
@@ -709,11 +747,14 @@ export class ChatView extends ItemView {
     // ── Show/hide recurrence fields based on repeat selection ──
     const updateRepeatVisibility = () => {
       const val = repeatSelect.value;
-      dayPillsRow.style.display = val === "weekly" ? "flex" : "none";
+      const customFreq = freqSelect.value;
+      customRow.style.display = val === "custom" ? "flex" : "none";
+      dayPillsRow.style.display = (val === "weekly" || (val === "custom" && customFreq === "weeks")) ? "flex" : "none";
       recurEndRow.style.display = val !== "none" ? "flex" : "none";
       endDateCol.style.display = val === "none" ? "block" : "none";
     };
     repeatSelect.addEventListener("change", updateRepeatVisibility);
+    freqSelect.addEventListener("change", updateRepeatVisibility);
     updateRepeatVisibility();
 
     // ── Notes/Description ──
@@ -792,6 +833,25 @@ export class ChatView extends ItemView {
             props.daysOfWeek = null;
             props.startRecur = null;
             props.endDate = null;
+          } else if (repeatValue === "custom") {
+            const interval = Math.max(1, parseInt(intervalInput.value, 10) || 1);
+            const freq = freqSelect.value; // days | weeks | months
+            props.type = "rrule";
+            let rruleParts = [`FREQ=${freq === "days" ? "DAILY" : freq === "weeks" ? "WEEKLY" : "MONTHLY"}`];
+            if (interval > 1) rruleParts.push(`INTERVAL=${interval}`);
+            if (freq === "weeks" && selectedDays.size > 0) {
+              const rruleDays = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+              rruleParts.push(`BYDAY=${Array.from(selectedDays).sort().map((n) => rruleDays[n]).join(",")}`);
+            } else if (freq === "months") {
+              const dayOfMonth = new Date(eventDate + "T00:00:00").getDate();
+              rruleParts.push(`BYMONTHDAY=${dayOfMonth}`);
+            }
+            props.rrule = rruleParts.join(";");
+            props.startDate = eventDate;
+            props.endRecur = recurEndDate || null;
+            props.daysOfWeek = null;
+            props.startRecur = null;
+            props.endDate = null;
           }
 
           await cm.updateEvent(existing.filePath, props);
@@ -823,6 +883,22 @@ export class ChatView extends ItemView {
             await cm.createEvent({
               title, date: eventDate, allDay: isAllDay, startTime, endTime,
               type: "rrule", rrule: `FREQ=MONTHLY;BYMONTHDAY=${dayOfMonth}`, body,
+            });
+          } else if (repeatValue === "custom") {
+            const interval = Math.max(1, parseInt(intervalInput.value, 10) || 1);
+            const freq = freqSelect.value;
+            const rruleDays = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+            let rruleParts = [`FREQ=${freq === "days" ? "DAILY" : freq === "weeks" ? "WEEKLY" : "MONTHLY"}`];
+            if (interval > 1) rruleParts.push(`INTERVAL=${interval}`);
+            if (freq === "weeks" && selectedDays.size > 0) {
+              rruleParts.push(`BYDAY=${Array.from(selectedDays).sort().map((n) => rruleDays[n]).join(",")}`);
+            } else if (freq === "months") {
+              const dayOfMonth = new Date(eventDate + "T00:00:00").getDate();
+              rruleParts.push(`BYMONTHDAY=${dayOfMonth}`);
+            }
+            await cm.createEvent({
+              title, date: eventDate, allDay: isAllDay, startTime, endTime,
+              type: "rrule", rrule: rruleParts.join(";"), body,
             });
           }
 

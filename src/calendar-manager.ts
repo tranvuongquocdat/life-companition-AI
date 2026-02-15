@@ -165,15 +165,61 @@ export class CalendarManager {
       if (event.startDate && dateStr < event.startDate) return false;
       if (event.skipDates?.includes(dateStr)) return false;
       if (event.rrule) {
-        const monthlyMatch = event.rrule.match(/FREQ=MONTHLY;BYMONTHDAY=(\d+)/);
-        if (monthlyMatch) return date.getDate() === parseInt(monthlyMatch[1], 10);
-        const dailyMatch = event.rrule.match(/FREQ=DAILY/);
-        if (dailyMatch) return true;
+        return this.matchRrule(event.rrule, event.startDate || event.date || dateStr, dateStr, date);
       }
-      return true; // fallback for unsupported rrule patterns
+      return true; // fallback: no rrule string
     }
 
     return false;
+  }
+
+  // ─── RRULE Matching ─────────────────────────────────────
+
+  private static readonly RRULE_DOW_MAP: Record<string, number> = {
+    SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6,
+  };
+
+  private matchRrule(rrule: string, startDateStr: string, _dateStr: string, date: Date): boolean {
+    const parts: Record<string, string> = {};
+    for (const seg of rrule.split(";")) {
+      const [k, v] = seg.split("=");
+      if (k && v) parts[k] = v;
+    }
+
+    const freq = parts["FREQ"];
+    const interval = parseInt(parts["INTERVAL"] || "1", 10);
+    const start = new Date(startDateStr + "T00:00:00");
+
+    if (freq === "DAILY") {
+      if (interval <= 1) return true;
+      const diffDays = Math.round((date.getTime() - start.getTime()) / 86400000);
+      return diffDays >= 0 && diffDays % interval === 0;
+    }
+
+    if (freq === "WEEKLY") {
+      // Check BYDAY constraint
+      if (parts["BYDAY"]) {
+        const allowedDays = parts["BYDAY"].split(",").map((d) => CalendarManager.RRULE_DOW_MAP[d]);
+        if (!allowedDays.includes(date.getDay())) return false;
+      }
+      if (interval <= 1) return true;
+      // Check week interval: count weeks since start
+      const diffDays = Math.round((date.getTime() - start.getTime()) / 86400000);
+      const diffWeeks = Math.floor(diffDays / 7);
+      return diffDays >= 0 && diffWeeks % interval === 0;
+    }
+
+    if (freq === "MONTHLY") {
+      if (parts["BYMONTHDAY"]) {
+        if (date.getDate() !== parseInt(parts["BYMONTHDAY"], 10)) return false;
+      }
+      if (interval <= 1) return true;
+      // Check month interval
+      const monthDiff = (date.getFullYear() - start.getFullYear()) * 12 + (date.getMonth() - start.getMonth());
+      return monthDiff >= 0 && monthDiff % interval === 0;
+    }
+
+    return true; // unsupported FREQ — show rather than hide
   }
 
   // ─── Tool: get_events ───────────────────────────────────

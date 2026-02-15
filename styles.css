@@ -1373,7 +1373,8 @@ body.lc-resizing {
 /* ─── Enhanced Event Form ──────────────────────────────── */
 
 .lc-cal-form-date-row {
-  flex-direction: row;
+  flex-direction: row !important;
+  align-items: flex-end;
   gap: 10px;
 }
 
@@ -1382,6 +1383,7 @@ body.lc-resizing {
   flex-direction: column;
   gap: 3px;
   flex: 1;
+  min-width: 0;
 }
 
 .lc-cal-form-col > label {
@@ -1390,14 +1392,42 @@ body.lc-resizing {
   color: var(--text-muted);
 }
 
+.lc-cal-form-col > input {
+  width: 100%;
+}
+
 .lc-cal-form-select {
   appearance: auto;
   cursor: pointer;
 }
 
+/* Custom repeat row */
+.lc-cal-form-custom-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lc-cal-form-custom-row > span {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.lc-cal-form-interval {
+  width: 50px;
+  text-align: center;
+}
+
+.lc-cal-form-freq-select {
+  width: auto;
+  min-width: 80px;
+}
+
 /* Day-of-week pills for weekly recurrence */
 .lc-cal-day-pills-row {
-  flex-direction: row;
+  flex-direction: row !important;
   gap: 4px;
   flex-wrap: wrap;
   padding: 4px 0;
@@ -1438,7 +1468,7 @@ body.lc-resizing {
 
 /* Recurrence end row */
 .lc-cal-form-recur-end-row {
-  flex-direction: row;
+  flex-direction: row !important;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;

@@ -111,7 +111,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
   private renderProviderSection(containerEl: HTMLElement, provider: AIProvider, label: string) {
     const t = this.t;
     const hasKey = this.plugin.hasCredentialsFor(provider);
-    const isCollapsed = this.collapsed[provider] ?? !hasKey; // default: collapsed if no key
+    const isCollapsed = this.collapsed[provider] ?? true; // default: collapsed
 
     // Card container
     const card = containerEl.createDiv({ cls: "lc-provider-card" });
