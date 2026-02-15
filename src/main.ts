@@ -34,8 +34,9 @@ const WRITE_TOOLS = new Set([
 /** Pattern to detect when AI claims it wrote/created something */
 const WRITE_CLAIM_PATTERN = /(?:Đã (?:tạo|lưu|cập nhật|ghi|thêm|viết|sửa|di chuyển|xóa)|(?:Created|Saved|Updated|Written|Moved|Deleted|Added) (?:note|event|file|entry|daily))/i;
 
-function selectTools(message: string, mode: ChatMode, enabledTools: string[]): ToolDefinition[] {
-  const ALL = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...CALENDAR_TOOLS, ...WEB_TOOLS];
+function selectTools(message: string, mode: ChatMode, enabledTools: string[], calendarAvailable: boolean): ToolDefinition[] {
+  const calendarTools = calendarAvailable ? CALENDAR_TOOLS : [];
+  const ALL = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...calendarTools, ...WEB_TOOLS];
   const filterEnabled = (defs: ToolDefinition[]) =>
     defs.filter((t) => enabledTools.includes(t.name));
 
@@ -44,7 +45,7 @@ function selectTools(message: string, mode: ChatMode, enabledTools: string[]): T
 
   // Quick mode: include all non-web tools,
   // only add web tools if message explicitly needs them
-  const tools: ToolDefinition[] = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...CALENDAR_TOOLS];
+  const tools: ToolDefinition[] = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...calendarTools];
 
   const webHint = /\b(web|google|tra cứu|research|internet|url|http|website|trang web|tìm trên mạng|online|fetch|search online|search web)\b/i;
   if (webHint.test(message)) tools.push(...WEB_TOOLS);
@@ -220,8 +221,9 @@ export default class LifeCompanionPlugin extends Plugin {
       const streamEl = view.createStreamingMessage();
       let accumulatedText = "";
       let thinkingStopped = false;
-      const tools = selectTools(text, conversation.mode, this.settings.enabledTools);
-      const calledWriteTools = new Set<string>();
+      const calendarAvailable = this.calendarManager.isFullCalendarInstalled();
+      const tools = selectTools(text, conversation.mode, this.settings.enabledTools, calendarAvailable);
+      const writeToolResults = new Map<string, boolean>(); // name → succeeded
 
       const aiResponse = await this.aiClient.sendMessage({
         userMessage: text,
@@ -250,20 +252,24 @@ export default class LifeCompanionPlugin extends Plugin {
         onToolUse: (name, input) => {
           view.addToolCall(name, input);
           view.scrollToBottom();
-          if (WRITE_TOOLS.has(name)) calledWriteTools.add(name);
         },
         onToolResult: (name, result) => {
           view.completeToolCall(name, result);
+          if (WRITE_TOOLS.has(name)) {
+            const succeeded = !result.startsWith("Error") && !result.includes("not available");
+            writeToolResults.set(name, succeeded);
+          }
         },
       });
       let response = aiResponse.text;
       view.stopStreaming();
 
-      // ─── Hallucination detection: warn if AI claims writes without tool calls ───
-      if (calledWriteTools.size === 0 && WRITE_CLAIM_PATTERN.test(response)) {
+      // ─── Hallucination detection: warn if AI claims writes without successful tool calls ───
+      const hasSuccessfulWrite = [...writeToolResults.values()].some(v => v);
+      if (!hasSuccessfulWrite && WRITE_CLAIM_PATTERN.test(response)) {
         const warning = this.settings.language === "vi"
-          ? "\n\n⚠️ *Lưu ý: Mình chưa thực sự gọi tool để lưu/tạo gì cả. Nếu bạn muốn lưu, hãy nhắc lại nhé!*"
-          : "\n\n⚠️ *Note: I didn't actually call any tool to save/create anything. If you want me to save, please ask again!*";
+          ? "\n\n⚠️ *Lưu ý: Mình chưa thực sự lưu/tạo gì thành công. Nếu bạn muốn lưu, hãy nhắc lại nhé!*"
+          : "\n\n⚠️ *Note: I didn't successfully save/create anything. If you want me to save, please ask again!*";
         response += warning;
         accumulatedText += warning;
         view.renderMarkdown(streamEl, accumulatedText);
