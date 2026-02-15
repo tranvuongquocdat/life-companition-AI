@@ -42,6 +42,9 @@ export class ChatView extends ItemView {
   private thinkingTimerInterval: ReturnType<typeof setInterval> | null = null;
   private streamingEl: HTMLElement | null = null;
 
+  // Track conversations currently processing (for tab switching — keeps live in-memory state)
+  private processingConversations = new Map<string, ConversationState>();
+
   // History panel
   private historyPanel: HTMLElement | null = null;
 
@@ -314,10 +317,14 @@ export class ChatView extends ItemView {
     for (const tabId of openTabs) {
       const conv = this.plugin.settings.savedConversations.find((c) => c.id === tabId);
       const title = conv?.title || this.t.newChat;
+      const isProcessing = this.processingConversations.has(tabId);
 
       const tab = this.tabScrollArea.createDiv({
-        cls: `lc-tab ${tabId === activeId ? "lc-tab-active" : ""}`,
+        cls: `lc-tab ${tabId === activeId ? "lc-tab-active" : ""}${isProcessing ? " lc-tab-processing" : ""}`,
       });
+      if (isProcessing) {
+        tab.createSpan({ cls: "lc-tab-processing-dot" });
+      }
       const truncated = title.length > 18 ? title.slice(0, 18) + "..." : title;
       tab.createSpan({ cls: "lc-tab-title", text: truncated });
 
@@ -372,8 +379,8 @@ export class ChatView extends ItemView {
   private switchToTab(tabId: string) {
     if (tabId === this.conversation.id && this.plugin.settings.activeTabId !== ChatView.CALENDAR_TAB_ID) return;
 
-    // Save current
-    if (this.conversation.messages.length > 0) {
+    // Save current conversation (unless it's being processed — that saves itself)
+    if (this.conversation.messages.length > 0 && !this.processingConversations.has(this.conversation.id)) {
       this.plugin.saveConversation(this.conversation);
     }
 
@@ -382,10 +389,20 @@ export class ChatView extends ItemView {
     this.calendarContainer.addClass("lc-hidden");
     this.bottomEl.removeClass("lc-hidden");
 
-    const saved = this.plugin.settings.savedConversations.find((c) => c.id === tabId);
-    if (saved) {
-      this.loadConversation(saved);
+    // Use LIVE in-memory conversation if it's being processed (has latest messages)
+    const processing = this.processingConversations.get(tabId);
+    if (processing) {
+      this.loadConversationState(processing);
+    } else {
+      const saved = this.plugin.settings.savedConversations.find((c) => c.id === tabId);
+      if (saved) {
+        this.loadConversation(saved);
+      }
     }
+
+    // Re-enable input for the new tab (previous tab's request continues in background)
+    this.inputEl.disabled = false;
+    this.sendBtn.disabled = false;
 
     this.plugin.settings.activeTabId = tabId;
     this.plugin.saveData(this.plugin.settings);
@@ -1461,19 +1478,33 @@ export class ChatView extends ItemView {
     this.autoResizeInput();
     this.addUserMessage(text, attachmentRefs);
 
+    // Capture the conversation we're sending to — may change if user switches tabs during await
+    const targetConv = this.conversation;
+    this.processingConversations.set(targetConv.id, targetConv);
+    this.plugin.saveConversation(targetConv); // Crash safety: user message persists immediately
+    this.renderTabs(); // show processing indicator
+
     this.inputEl.disabled = true;
     this.sendBtn.disabled = true;
 
     try {
-      await this.plugin.handleMessage(text, this.conversation, this, attachments);
-      this.conversation.updatedAt = Date.now();
-      // Auto-save after each exchange
-      this.plugin.saveConversation(this.conversation);
+      await this.plugin.handleMessage(text, targetConv, this, attachments);
+      targetConv.updatedAt = Date.now();
+      // Save the target conversation (not this.conversation which may have changed)
+      this.plugin.saveConversation(targetConv);
     } finally {
+      this.processingConversations.delete(targetConv.id);
+
+      // If we're currently viewing this conversation, re-render to show complete response
+      if (this.conversation.id === targetConv.id) {
+        this.loadConversationState(targetConv);
+      }
+
       this.inputEl.disabled = false;
       this.sendBtn.disabled = false;
       this.inputEl.focus();
       this.updateTokenCounter();
+      this.renderTabs(); // clear processing indicator
     }
   }
 

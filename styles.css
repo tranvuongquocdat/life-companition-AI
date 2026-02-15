@@ -80,6 +80,20 @@
   color: var(--text-error, #e53935);
 }
 
+.lc-tab-processing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  flex-shrink: 0;
+  animation: lc-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes lc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .lc-tab-actions {
   display: flex;
   align-items: center;

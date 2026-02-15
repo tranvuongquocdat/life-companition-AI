@@ -228,6 +228,7 @@ export default class LifeCompanionPlugin extends Plugin {
       const index = await this.profileManager.getIndex();
       // Gather briefing context for proactive reminders
       let briefingContext = "";
+      let preferencesContext = "";
       try {
         const parts: string[] = [];
         if (this.calendarManager.isFullCalendarInstalled()) {
@@ -251,11 +252,12 @@ export default class LifeCompanionPlugin extends Plugin {
         if (parts.length > 0) {
           briefingContext = parts.join("\n\n");
         }
+        preferencesContext = await this.vaultTools.getPreferenceContext();
       } catch (e) {
         console.warn("Briefing context failed:", e);
       }
 
-      const systemPrompt = buildSystemPrompt(profile, index, conversation.mode, briefingContext);
+      const systemPrompt = buildSystemPrompt(profile, index, conversation.mode, briefingContext, preferencesContext);
 
       view.startThinking();
       const streamEl = view.createStreamingMessage();

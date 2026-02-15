@@ -264,36 +264,60 @@ export class VaultTools {
 
   async searchVault(query: string): Promise<string> {
     const files = this.app.vault.getMarkdownFiles();
-    const results: { path: string; matches: string[] }[] = [];
     const queryLower = query.toLowerCase();
+    const queryNorm = this.normalizeVi(query);
+
+    const scored: { path: string; heading: string; score: number; matches: string[] }[] = [];
 
     for (const file of files) {
       const content = await this.app.vault.cachedRead(file);
       const lines = content.split("\n");
       const matches: string[] = [];
+      let score = 0;
 
+      // Extract first heading (H1 or first # line)
+      const headingLine = lines.find((l) => /^#{1,2}\s/.test(l));
+      const heading = headingLine ? headingLine.replace(/^#+\s*/, "").trim() : "";
+
+      // Filename match (highest priority) — normalize Vietnamese diacritics
+      const pathNorm = this.normalizeVi(file.path);
+      if (pathNorm.includes(queryNorm)) {
+        score += 100;
+        matches.push(`[filename match]`);
+      }
+
+      // Heading match (high priority)
+      if (heading && this.normalizeVi(heading).includes(queryNorm)) {
+        score += 50;
+      }
+
+      // Content matches — search both original and normalized
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].toLowerCase().includes(queryLower)) {
-          matches.push(`L${i + 1}: ${lines[i].trim()}`);
+        const line = lines[i];
+        if (line.toLowerCase().includes(queryLower) || this.normalizeVi(line).includes(queryNorm)) {
+          matches.push(`L${i + 1}: ${line.trim()}`);
+          score += line.startsWith("#") ? 10 : 1; // headings worth more
         }
       }
 
-      if (file.path.toLowerCase().includes(queryLower)) {
-        matches.unshift(`[filename match]`);
-      }
-
-      if (matches.length > 0) {
-        results.push({ path: file.path, matches: matches.slice(0, 5) });
+      if (score > 0) {
+        scored.push({ path: file.path, heading, score, matches: matches.slice(0, 5) });
       }
     }
 
-    if (results.length === 0) {
+    if (scored.length === 0) {
       return `No results found for "${query}".`;
     }
 
-    return results
+    // Sort by relevance score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored
       .slice(0, 20)
-      .map((r) => `## ${r.path}\n${r.matches.join("\n")}`)
+      .map((r) => {
+        const title = r.heading ? ` — ${r.heading}` : "";
+        return `## ${r.path}${title}\n${r.matches.join("\n")}`;
+      })
       .join("\n\n");
   }
 
@@ -985,5 +1009,26 @@ export class VaultTools {
       if (match) pending.push(`- [ ] ${match[1].trim()}`);
     }
     return pending.join("\n");
+  }
+
+  async getPreferenceContext(): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(this.MEMORIES_PATH);
+    if (!file || !(file instanceof TFile)) return "";
+
+    const content = await this.app.vault.read(file);
+    const blocks = content.split(/^## /m).slice(1);
+    const preferences: string[] = [];
+
+    for (const block of blocks) {
+      const lines = block.trim().split("\n");
+      const typeLine = lines[1] || "";
+      const memType = typeLine.replace("Type: ", "").trim();
+      if (memType !== "preference") continue;
+      const body = lines.slice(2).join(" ").trim();
+      if (body) preferences.push(`- ${body}`);
+    }
+
+    if (preferences.length === 0) return "";
+    return preferences.join("\n");
   }
 }
