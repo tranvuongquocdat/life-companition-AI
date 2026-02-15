@@ -1,7 +1,266 @@
 import { App, TFile, TFolder, TAbstractFile, Vault, requestUrl } from "obsidian";
 
+interface MemoryVectorEntry {
+  id: string;       // "YYYY-MM-DD HH:MM" matching markdown heading
+  content: string;
+  type: string;
+  vector: number[] | null;
+}
+
+interface MemoryVectorStore {
+  version: 1;
+  model: string;   // e.g. "openai:1536" or "gemini:768" — invalidate if changed
+  entries: MemoryVectorEntry[];
+}
+
+interface EmbeddingKeys {
+  openai?: string;
+  gemini?: string;
+}
+
 export class VaultTools {
+  private embeddingKeys: EmbeddingKeys = {};
+  private vectorCache: MemoryVectorStore | null = null;
+  private readonly VECTORS_PATH = "system/memory-vectors.json";
+
   constructor(private app: App) {}
+
+  setEmbeddingKeys(keys: EmbeddingKeys) {
+    this.embeddingKeys = {
+      openai: keys.openai || undefined,
+      gemini: keys.gemini || undefined,
+    };
+  }
+
+  private getEmbeddingProvider(): "openai" | "gemini" | null {
+    if (this.embeddingKeys.openai) return "openai";
+    if (this.embeddingKeys.gemini) return "gemini";
+    return null;
+  }
+
+  private getEmbeddingModelId(): string | null {
+    const p = this.getEmbeddingProvider();
+    if (p === "openai") return "openai:1536";
+    if (p === "gemini") return "gemini:768";
+    return null;
+  }
+
+  // ─── Vector Store I/O ─────────────────────────────────────────
+
+  private async loadVectorStore(): Promise<MemoryVectorStore> {
+    if (this.vectorCache) return this.vectorCache;
+    const modelId = this.getEmbeddingModelId() || "none";
+    const file = this.app.vault.getAbstractFileByPath(this.VECTORS_PATH);
+    if (file && file instanceof TFile) {
+      try {
+        const raw = await this.app.vault.read(file);
+        const parsed = JSON.parse(raw);
+        if (parsed?.version === 1 && Array.isArray(parsed.entries)) {
+          // If embedding provider changed, invalidate all vectors
+          if (parsed.model && parsed.model !== modelId) {
+            for (const entry of parsed.entries) entry.vector = null;
+            parsed.model = modelId;
+          }
+          if (!parsed.model) parsed.model = modelId;
+          this.vectorCache = parsed;
+          return this.vectorCache!;
+        }
+      } catch { /* corrupted — start fresh */ }
+    }
+    this.vectorCache = { version: 1, model: modelId, entries: [] };
+    return this.vectorCache;
+  }
+
+  private async saveVectorStore(): Promise<void> {
+    if (!this.vectorCache) return;
+    const json = JSON.stringify(this.vectorCache);
+    const file = this.app.vault.getAbstractFileByPath(this.VECTORS_PATH);
+    if (file && file instanceof TFile) {
+      await this.app.vault.modify(file, json);
+    } else {
+      await this.app.vault.create(this.VECTORS_PATH, json);
+    }
+  }
+
+  // ─── Embedding API (OpenAI → Gemini fallback) ─────────────────
+
+  private async getEmbedding(text: string): Promise<number[] | null> {
+    const provider = this.getEmbeddingProvider();
+    if (!provider) return null;
+    return provider === "openai"
+      ? this.getOpenAIEmbedding(text)
+      : this.getGeminiEmbedding(text);
+  }
+
+  private async getEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
+    const provider = this.getEmbeddingProvider();
+    if (!provider || texts.length === 0) return texts.map(() => null);
+    return provider === "openai"
+      ? this.getOpenAIEmbeddings(texts)
+      : this.getGeminiEmbeddings(texts);
+  }
+
+  // ── OpenAI ──
+
+  private async getOpenAIEmbedding(text: string): Promise<number[] | null> {
+    try {
+      const response = await requestUrl({
+        url: "https://api.openai.com/v1/embeddings",
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.embeddingKeys.openai}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "text-embedding-3-large",
+          input: text,
+          dimensions: 1536,
+        }),
+        throw: false,
+      });
+      if (response.status !== 200) return null;
+      return response.json?.data?.[0]?.embedding || null;
+    } catch { return null; }
+  }
+
+  private async getOpenAIEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
+    try {
+      const response = await requestUrl({
+        url: "https://api.openai.com/v1/embeddings",
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.embeddingKeys.openai}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "text-embedding-3-large",
+          input: texts,
+          dimensions: 1536,
+        }),
+        throw: false,
+      });
+      if (response.status !== 200) return texts.map(() => null);
+      const results: (number[] | null)[] = new Array(texts.length).fill(null);
+      for (const item of response.json?.data || []) {
+        if (item.index < texts.length) results[item.index] = item.embedding;
+      }
+      return results;
+    } catch { return texts.map(() => null); }
+  }
+
+  // ── Gemini ──
+
+  private async getGeminiEmbedding(text: string): Promise<number[] | null> {
+    try {
+      const response = await requestUrl({
+        url: `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${this.embeddingKeys.gemini}`,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "models/text-embedding-004",
+          content: { parts: [{ text }] },
+        }),
+        throw: false,
+      });
+      if (response.status !== 200) return null;
+      return response.json?.embedding?.values || null;
+    } catch { return null; }
+  }
+
+  private async getGeminiEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
+    // Gemini batchEmbedContents supports up to 100 per request
+    const results: (number[] | null)[] = new Array(texts.length).fill(null);
+    try {
+      for (let i = 0; i < texts.length; i += 100) {
+        const batch = texts.slice(i, i + 100);
+        const requests = batch.map((text) => ({
+          model: "models/text-embedding-004",
+          content: { parts: [{ text }] },
+        }));
+        const response = await requestUrl({
+          url: `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key=${this.embeddingKeys.gemini}`,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requests }),
+          throw: false,
+        });
+        if (response.status !== 200) continue;
+        const embeddings = response.json?.embeddings || [];
+        for (let j = 0; j < embeddings.length; j++) {
+          if (embeddings[j]?.values) results[i + j] = embeddings[j].values;
+        }
+      }
+      return results;
+    } catch { return results; }
+  }
+
+  // ─── BM25 + Vietnamese Normalization ──────────────────────────
+
+  private normalizeVi(text: string): string {
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  private tokenize(text: string): string[] {
+    return this.normalizeVi(text).split(/[\s\p{P}]+/u).filter((t) => t.length > 0);
+  }
+
+  private scoreBM25(query: string, docs: { id: string; text: string }[]): Map<string, number> {
+    const k1 = 1.5, b = 0.75;
+    const qTokens = this.tokenize(query);
+    if (qTokens.length === 0) return new Map();
+
+    const docTokens = docs.map((d) => this.tokenize(d.text));
+    const N = docs.length;
+    const avgDl = docTokens.reduce((s, t) => s + t.length, 0) / (N || 1);
+
+    const df = new Map<string, number>();
+    for (const qt of new Set(qTokens)) {
+      df.set(qt, docTokens.filter((dt) => dt.includes(qt)).length);
+    }
+
+    const scores = new Map<string, number>();
+    for (let i = 0; i < docs.length; i++) {
+      const tf = new Map<string, number>();
+      for (const t of docTokens[i]) tf.set(t, (tf.get(t) || 0) + 1);
+
+      let score = 0;
+      for (const qt of qTokens) {
+        const freq = tf.get(qt) || 0;
+        if (freq === 0) continue;
+        const idf = Math.log((N - (df.get(qt) || 0) + 0.5) / ((df.get(qt) || 0) + 0.5) + 1);
+        score += idf * (freq * (k1 + 1)) / (freq + k1 * (1 - b + b * docTokens[i].length / avgDl));
+      }
+      scores.set(docs[i].id, score);
+    }
+    return scores;
+  }
+
+  // ─── Cosine Similarity + Score Normalization ──────────────────
+
+  private cosineSim(a: number[], b: number[]): number {
+    if (a.length !== b.length) return 0;
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      na += a[i] * a[i];
+      nb += b[i] * b[i];
+    }
+    const d = Math.sqrt(na) * Math.sqrt(nb);
+    return d === 0 ? 0 : dot / d;
+  }
+
+  private normScores(scores: Map<string, number>): Map<string, number> {
+    const vals = [...scores.values()];
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = max - min;
+    const result = new Map<string, number>();
+    for (const [id, s] of scores) {
+      result.set(id, range === 0 ? (s > 0 ? 1 : 0) : (s - min) / range);
+    }
+    return result;
+  }
+
+  // ─── Vault Tools ──────────────────────────────────────────────
 
   async searchVault(query: string): Promise<string> {
     const files = this.app.vault.getMarkdownFiles();
@@ -410,5 +669,321 @@ export class VaultTools {
     }
 
     return text || "No content found at this URL.";
+  }
+
+  // ─── Memory & Goals Tools ────────────────────────────────────
+
+  private readonly MEMORIES_PATH = "system/memories.md";
+  private readonly GOALS_PATH = "system/goals.md";
+
+  async saveMemory(content: string, type?: string): Promise<string> {
+    const memoryType = type || "fact";
+    const validTypes = ["fact", "preference", "context", "emotional"];
+    if (!validTypes.includes(memoryType)) {
+      return `Invalid memory type "${memoryType}". Use: ${validTypes.join(", ")}`;
+    }
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 5);
+    const entry = `\n## ${dateStr} ${timeStr}\nType: ${memoryType}\n${content}\n`;
+
+    const file = this.app.vault.getAbstractFileByPath(this.MEMORIES_PATH);
+    if (file && file instanceof TFile) {
+      await this.app.vault.append(file, entry);
+    } else {
+      const header = "# Memories\n\n> Auto-managed by Life Companion. Each entry is a saved memory.\n";
+      await this.app.vault.create(this.MEMORIES_PATH, header + entry);
+    }
+    // Add to vector store + embed inline
+    const id = `${dateStr} ${timeStr}`;
+    const store = await this.loadVectorStore();
+    store.entries.push({ id, content, type: memoryType, vector: null });
+
+    if (this.getEmbeddingProvider()) {
+      const vector = await this.getEmbedding(content);
+      const entry = store.entries[store.entries.length - 1];
+      if (vector) entry.vector = vector;
+    }
+
+    await this.saveVectorStore();
+
+    return `Saved memory (${memoryType}): ${content.slice(0, 80)}${content.length > 80 ? "..." : ""}`;
+  }
+
+  async recallMemory(query?: string, days?: number, limit?: number): Promise<string> {
+    const maxEntries = limit || 10;
+    const file = this.app.vault.getAbstractFileByPath(this.MEMORIES_PATH);
+    if (!file || !(file instanceof TFile)) {
+      return "No memories saved yet.";
+    }
+
+    const content = await this.app.vault.read(file);
+    const entries: { date: string; type: string; content: string }[] = [];
+    const blocks = content.split(/^## /m).slice(1);
+
+    for (const block of blocks) {
+      const lines = block.trim().split("\n");
+      const dateLine = lines[0] || "";
+      const typeLine = lines[1] || "";
+      const bodyLines = lines.slice(2).join("\n").trim();
+      const dateStr = dateLine.split(" ")[0];
+      const memType = typeLine.replace("Type: ", "").trim();
+      entries.push({ date: dateStr, type: memType, content: bodyLines });
+    }
+
+    let filtered = entries;
+
+    if (days) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      filtered = filtered.filter((e) => e.date >= cutoffStr);
+    }
+
+    if (query) {
+      // Hybrid search: BM25 + cosine similarity
+      const docs = filtered.map((e, i) => ({ id: String(i), text: `${e.type} ${e.content}` }));
+      const bm25 = this.normScores(this.scoreBM25(query, docs));
+
+      let cosineScores: Map<string, number> | null = null;
+      if (this.getEmbeddingProvider()) {
+        try {
+          const qVec = await this.getEmbedding(query);
+          if (qVec) {
+            const store = await this.loadVectorStore();
+            const raw = new Map<string, number>();
+            for (let i = 0; i < filtered.length; i++) {
+              const e = filtered[i];
+              const ve = store.entries.find((v) => v.content === e.content && v.type === e.type);
+              raw.set(String(i), ve?.vector ? this.cosineSim(qVec, ve.vector) : 0);
+            }
+            cosineScores = this.normScores(raw);
+          }
+        } catch { /* fallback to BM25 only */ }
+      }
+
+      // Combine and sort
+      const scored = filtered.map((entry, i) => {
+        const id = String(i);
+        const b = bm25.get(id) || 0;
+        const c = cosineScores?.get(id) || 0;
+        const score = cosineScores ? 0.3 * b + 0.7 * c : b;
+        return { entry, score };
+      }).filter((r) => r.score > 0);
+
+      scored.sort((a, b) => b.score - a.score);
+      filtered = scored.slice(0, maxEntries).map((r) => r.entry);
+    } else {
+      // No query — return most recent
+      filtered = filtered.slice(-maxEntries).reverse();
+    }
+
+    if (filtered.length === 0) {
+      return query ? `No memories found matching "${query}".` : "No memories found.";
+    }
+
+    return filtered.map((e) => `## ${e.date}\nType: ${e.type}\n${e.content}`).join("\n\n");
+  }
+
+  async gatherRetroData(startDate: string, endDate: string): Promise<string> {
+    const sections: string[] = [];
+
+    // 1. Daily notes in range
+    const dailyNotes: string[] = [];
+    const start = new Date(startDate + "T00:00:00");
+    const end = new Date(endDate + "T00:00:00");
+    const current = new Date(start);
+    while (current <= end) {
+      const dateStr = current.toISOString().slice(0, 10);
+      const path = `daily/${dateStr}.md`;
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file && file instanceof TFile) {
+        const content = await this.app.vault.cachedRead(file);
+        dailyNotes.push(`### ${dateStr}\n${content.slice(0, 500)}`);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    if (dailyNotes.length > 0) {
+      sections.push(`## Daily Notes\n${dailyNotes.join("\n\n")}`);
+    }
+
+    // 2. Memories in range
+    const memFile = this.app.vault.getAbstractFileByPath(this.MEMORIES_PATH);
+    if (memFile && memFile instanceof TFile) {
+      const memContent = await this.app.vault.read(memFile);
+      const memBlocks = memContent.split(/^## /m).slice(1);
+      const inRange = memBlocks.filter((block) => {
+        const dateStr = block.trim().split(" ")[0];
+        return dateStr >= startDate && dateStr <= endDate;
+      });
+      if (inRange.length > 0) {
+        sections.push(`## Memories\n${inRange.map((b) => `## ${b.trim()}`).join("\n\n")}`);
+      }
+    }
+
+    // 3. Goals
+    const goalsFile = this.app.vault.getAbstractFileByPath(this.GOALS_PATH);
+    if (goalsFile && goalsFile instanceof TFile) {
+      const goalsContent = await this.app.vault.cachedRead(goalsFile);
+      sections.push(`## Current Goals\n${goalsContent}`);
+    }
+
+    // 4. Recently modified notes in range
+    const startMs = start.getTime();
+    const endMs = end.getTime() + 24 * 60 * 60 * 1000;
+    const recentFiles = this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => f.stat.mtime >= startMs && f.stat.mtime <= endMs)
+      .filter((f) => !f.path.startsWith("daily/") && !f.path.startsWith("system/"))
+      .sort((a, b) => b.stat.mtime - a.stat.mtime)
+      .slice(0, 15);
+    if (recentFiles.length > 0) {
+      const noteList = recentFiles
+        .map((f) => {
+          const date = new Date(f.stat.mtime).toISOString().slice(0, 10);
+          return `- ${date} — ${f.path}`;
+        })
+        .join("\n");
+      sections.push(`## Modified Notes\n${noteList}`);
+    }
+
+    if (sections.length === 0) {
+      return `No data found for ${startDate} to ${endDate}.`;
+    }
+
+    return `# Retro Data: ${startDate} to ${endDate}\n\n${sections.join("\n\n---\n\n")}`;
+  }
+
+  async saveRetro(period: string, content: string): Promise<string> {
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const path = `system/retro/${dateStr}-${period}.md`;
+    const existing = this.app.vault.getAbstractFileByPath(path);
+
+    if (existing && existing instanceof TFile) {
+      await this.app.vault.modify(existing, content);
+      return `Updated retro: ${path}`;
+    }
+
+    const folderPath = "system/retro";
+    if (!this.app.vault.getAbstractFileByPath(folderPath)) {
+      await this.app.vault.createFolder(folderPath);
+    }
+    await this.app.vault.create(path, content);
+    return `Created retro: ${path}`;
+  }
+
+  async getGoals(): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(this.GOALS_PATH);
+    if (!file || !(file instanceof TFile)) {
+      return "No goals file found. Use update_goal to create your first goal.";
+    }
+    return await this.app.vault.read(file);
+  }
+
+  async updateGoal(
+    title: string,
+    updates: { status?: string; progress?: string; target?: string }
+  ): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(this.GOALS_PATH);
+    const dateStr = new Date().toISOString().slice(0, 10);
+
+    if (!file || !(file instanceof TFile)) {
+      const newGoal = `## \u{1F3AF} ${title}\n- Target: ${updates.target || "TBD"}\n- Status: ${updates.status || "In Progress"}\n- Progress: ${updates.progress || "(no progress notes yet)"}\n- Last updated: ${dateStr}\n`;
+      const header =
+        "# Goals\n\n> Track your life goals here. Managed by Life Companion.\n\n";
+      await this.app.vault.create(this.GOALS_PATH, header + newGoal);
+      return `Created goals file with goal: ${title}`;
+    }
+
+    const content = await this.app.vault.read(file);
+    const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const goalPattern = new RegExp(`^## [^\\n]*${escaped}`, "m");
+    const match = content.match(goalPattern);
+
+    if (!match || match.index === undefined) {
+      const newGoal = `\n## \u{1F3AF} ${title}\n- Target: ${updates.target || "TBD"}\n- Status: ${updates.status || "In Progress"}\n- Progress: ${updates.progress || "(no progress notes yet)"}\n- Last updated: ${dateStr}\n`;
+      await this.app.vault.append(file, newGoal);
+      return `Added new goal: ${title}`;
+    }
+
+    const startIdx = match.index;
+    const rest = content.slice(startIdx);
+    const nextHeading = rest.indexOf("\n## ", 1);
+    const endIdx = nextHeading >= 0 ? startIdx + nextHeading : content.length;
+    let goalBlock = content.slice(startIdx, endIdx);
+
+    if (updates.status) {
+      goalBlock = goalBlock.replace(/- Status: .+/, `- Status: ${updates.status}`);
+    }
+    if (updates.progress) {
+      goalBlock = goalBlock.replace(/- Progress: .+/, `- Progress: ${updates.progress}`);
+    }
+    if (updates.target) {
+      goalBlock = goalBlock.replace(/- Target: .+/, `- Target: ${updates.target}`);
+    }
+    goalBlock = goalBlock.replace(/- Last updated: .+/, `- Last updated: ${dateStr}`);
+
+    const newContent = content.slice(0, startIdx) + goalBlock + content.slice(endIdx);
+    await this.app.vault.modify(file, newContent);
+    return `Updated goal: ${title}`;
+  }
+
+  async backfillEmbeddings(): Promise<string> {
+    if (!this.getEmbeddingProvider()) return "No API key.";
+    const file = this.app.vault.getAbstractFileByPath(this.MEMORIES_PATH);
+    if (!file || !(file instanceof TFile)) return "No memories.";
+
+    const content = await this.app.vault.read(file);
+    const blocks = content.split(/^## /m).slice(1);
+    const store = await this.loadVectorStore();
+
+    const toEmbed: { idx: number; text: string }[] = [];
+    for (const block of blocks) {
+      const lines = block.trim().split("\n");
+      const id = (lines[0] || "").trim();
+      const memType = (lines[1] || "").replace("Type: ", "").trim();
+      const body = lines.slice(2).join("\n").trim();
+
+      let entry = store.entries.find((e) => e.id === id);
+      if (!entry) {
+        entry = { id, content: body, type: memType, vector: null };
+        store.entries.push(entry);
+      }
+      if (!entry.vector) {
+        toEmbed.push({ idx: store.entries.indexOf(entry), text: body });
+      }
+    }
+
+    // Batch embed in groups of 50
+    for (let i = 0; i < toEmbed.length; i += 50) {
+      const batch = toEmbed.slice(i, i + 50);
+      const vectors = await this.getEmbeddings(batch.map((b) => b.text));
+      for (let j = 0; j < batch.length; j++) {
+        if (vectors[j]) store.entries[batch[j].idx].vector = vectors[j];
+      }
+    }
+
+    await this.saveVectorStore();
+    return `Backfilled ${toEmbed.length} memories.`;
+  }
+
+  async getRecentMemories(limit: number = 10): Promise<string> {
+    return this.recallMemory(undefined, undefined, limit);
+  }
+
+  async getPendingDailyTasks(): Promise<string> {
+    const today = new Date().toISOString().slice(0, 10);
+    const path = `daily/${today}.md`;
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!file || !(file instanceof TFile)) return "";
+
+    const content = await this.app.vault.cachedRead(file);
+    const pending: string[] = [];
+    for (const line of content.split("\n")) {
+      const match = line.match(/^\s*-\s*\[ \]\s*(.*)/);
+      if (match) pending.push(`- [ ] ${match[1].trim()}`);
+    }
+    return pending.join("\n");
   }
 }

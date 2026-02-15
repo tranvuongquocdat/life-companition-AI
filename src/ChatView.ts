@@ -441,10 +441,12 @@ export class ChatView extends ItemView {
       this.renderCalendar();
     });
 
-    // Day-of-week header
+    // Day-of-week header (respects start day setting)
+    const startDay = this.plugin.settings.calendarStartDay ?? 1;
+    const allDow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const grid = this.calendarContainer.createDiv({ cls: "lc-cal-grid" });
-    for (const dow of ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) {
-      grid.createDiv({ cls: "lc-cal-dow", text: dow });
+    for (let i = 0; i < 7; i++) {
+      grid.createDiv({ cls: "lc-cal-dow", text: allDow[(startDay + i) % 7] });
     }
 
     // Get events for this month
@@ -457,7 +459,7 @@ export class ChatView extends ItemView {
 
     // Calculate grid
     const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
-    const startDow = firstDay.getDay();
+    const startDow = (firstDay.getDay() - startDay + 7) % 7;
     const daysInMonth = new Date(this.calendarYear, this.calendarMonth + 1, 0).getDate();
     const todayStr = new Date().toISOString().split("T")[0];
 
@@ -498,7 +500,12 @@ export class ChatView extends ItemView {
 
     // Selected day event list
     if (this.calendarSelectedDate) {
-      const selectedEvents = eventsMap.get(this.calendarSelectedDate) || [];
+      const selectedEvents = (eventsMap.get(this.calendarSelectedDate) || []).sort((a, b) => {
+        // All-day events first, then by start time ascending
+        if (a.allDay && !b.allDay) return -1;
+        if (!a.allDay && b.allDay) return 1;
+        return (a.startTime || "").localeCompare(b.startTime || "");
+      });
       const dateLabel = new Date(this.calendarSelectedDate + "T00:00:00")
         .toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
@@ -711,7 +718,9 @@ export class ChatView extends ItemView {
       }
     }
 
-    for (let i = 0; i < 7; i++) {
+    const pillStartDay = this.plugin.settings.calendarStartDay ?? 1;
+    for (let j = 0; j < 7; j++) {
+      const i = (pillStartDay + j) % 7;
       const pill = dayPillsRow.createEl("button", {
         cls: `lc-cal-day-pill${selectedDays.has(i) ? " lc-cal-day-pill-active" : ""}`,
         text: DOW_LABELS[i].charAt(0),
@@ -1089,6 +1098,18 @@ export class ChatView extends ItemView {
         return t.toolDeletingEvent;
       case "get_upcoming_events":
         return t.toolUpcoming(input.days || 7);
+      case "save_memory":
+        return t.toolSavingMemory;
+      case "recall_memory":
+        return t.toolRecalling(input.query as string | undefined);
+      case "gather_retro_data":
+        return t.toolGatheringRetro(String(input.startDate || ""), String(input.endDate || ""));
+      case "save_retro":
+        return t.toolSavingRetro(String(input.period || ""));
+      case "get_goals":
+        return t.toolGettingGoals;
+      case "update_goal":
+        return t.toolUpdatingGoal(String(input.title || ""));
       default:
         return t.toolUsing(name);
     }

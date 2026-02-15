@@ -21,7 +21,7 @@ import {
 } from "./types";
 import { VaultTools } from "./vault-tools";
 import { CalendarManager } from "./calendar-manager";
-import { VAULT_TOOLS, WEB_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, type ToolDefinition } from "./tool-definitions";
+import { VAULT_TOOLS, WEB_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, MEMORY_TOOLS, type ToolDefinition } from "./tool-definitions";
 import { getI18n } from "./i18n";
 
 /** Tools that create/modify vault content — used for hallucination detection */
@@ -29,14 +29,15 @@ const WRITE_TOOLS = new Set([
   "write_note", "append_note", "move_note",
   "create_daily_note", "update_properties",
   "create_event", "update_event", "delete_event",
+  "save_memory", "save_retro", "update_goal",
 ]);
 
 /** Pattern to detect when AI claims it wrote/created something */
-const WRITE_CLAIM_PATTERN = /(?:Đã (?:tạo|lưu|cập nhật|ghi|thêm|viết|sửa|di chuyển|xóa)|(?:Created|Saved|Updated|Written|Moved|Deleted|Added) (?:note|event|file|entry|daily))/i;
+const WRITE_CLAIM_PATTERN = /(?:Đã (?:tạo|lưu|cập nhật|ghi|thêm|viết|sửa|di chuyển|xóa)|(?:Created|Saved|Updated|Written|Moved|Deleted|Added) (?:note|event|file|entry|daily|memory|goal|retro)|(?:I(?:'ve| have) (?:created|saved|updated|written|moved|deleted|added)))/i;
 
 function selectTools(message: string, mode: ChatMode, enabledTools: string[], calendarAvailable: boolean): ToolDefinition[] {
   const calendarTools = calendarAvailable ? CALENDAR_TOOLS : [];
-  const ALL = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...calendarTools, ...WEB_TOOLS];
+  const ALL = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...calendarTools, ...MEMORY_TOOLS, ...WEB_TOOLS];
   const filterEnabled = (defs: ToolDefinition[]) =>
     defs.filter((t) => enabledTools.includes(t.name));
 
@@ -45,7 +46,7 @@ function selectTools(message: string, mode: ChatMode, enabledTools: string[], ca
 
   // Quick mode: include all non-web tools,
   // only add web tools if message explicitly needs them
-  const tools: ToolDefinition[] = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...calendarTools];
+  const tools: ToolDefinition[] = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...calendarTools, ...MEMORY_TOOLS];
 
   const webHint = /\b(web|google|tra cứu|research|internet|url|http|website|trang web|tìm trên mạng|online|fetch|search online|search web)\b/i;
   if (webHint.test(message)) tools.push(...WEB_TOOLS);
@@ -64,6 +65,10 @@ export default class LifeCompanionPlugin extends Plugin {
     await this.loadSettings();
 
     this.vaultTools = new VaultTools(this.app);
+    this.vaultTools.setEmbeddingKeys({
+      openai: this.settings.openaiApiKey,
+      gemini: this.settings.geminiApiKey,
+    });
     this.calendarManager = new CalendarManager(this.app, () => this.settings.calendarEventsDirectory);
     this.profileManager = new ProfileManager(this.app);
     this.initAIClient();
@@ -84,6 +89,11 @@ export default class LifeCompanionPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(async () => {
       await this.profileManager.ensureLifeFolder();
+      if (this.settings.openaiApiKey || this.settings.geminiApiKey) {
+        this.vaultTools.backfillEmbeddings().catch((e) =>
+          console.warn("Memory backfill failed:", e)
+        );
+      }
     });
   }
 
@@ -215,7 +225,36 @@ export default class LifeCompanionPlugin extends Plugin {
     try {
       const profile = await this.profileManager.getProfile();
       const index = await this.profileManager.getIndex();
-      const systemPrompt = buildSystemPrompt(profile, index, conversation.mode);
+      // Gather briefing context for proactive reminders
+      let briefingContext = "";
+      try {
+        const parts: string[] = [];
+        if (this.calendarManager.isFullCalendarInstalled()) {
+          const events = await this.calendarManager.getUpcomingEvents(3);
+          if (events && !events.includes("No events")) {
+            parts.push(`### Upcoming Events (3 days)\n${events}`);
+          }
+        }
+        const memories = await this.vaultTools.getRecentMemories(10);
+        if (memories && !memories.startsWith("No memories")) {
+          parts.push(`### Recent Memories\n${memories}`);
+        }
+        const tasks = await this.vaultTools.getPendingDailyTasks();
+        if (tasks) {
+          parts.push(`### Today's Pending Tasks\n${tasks}`);
+        }
+        const goals = await this.vaultTools.getGoals();
+        if (goals && !goals.includes("No goals file")) {
+          parts.push(`### Goals\n${goals.length > 600 ? goals.slice(0, 600) + "\n..." : goals}`);
+        }
+        if (parts.length > 0) {
+          briefingContext = parts.join("\n\n");
+        }
+      } catch (e) {
+        console.warn("Briefing context failed:", e);
+      }
+
+      const systemPrompt = buildSystemPrompt(profile, index, conversation.mode, briefingContext);
 
       view.startThinking();
       const streamEl = view.createStreamingMessage();
@@ -421,6 +460,10 @@ export default class LifeCompanionPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
     this.initAIClient();
+    this.vaultTools.setEmbeddingKeys({
+      openai: this.settings.openaiApiKey,
+      gemini: this.settings.geminiApiKey,
+    });
     // Refresh model dropdown in any open ChatView
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)) {
       (leaf.view as ChatView).refreshModels();

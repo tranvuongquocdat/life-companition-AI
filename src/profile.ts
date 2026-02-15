@@ -106,6 +106,20 @@ export class ProfileManager {
       }
     }
 
+    // Ensure default memory and goals files
+    if (!this.app.vault.getAbstractFileByPath("system/memories.md")) {
+      await this.app.vault.create(
+        "system/memories.md",
+        "# Memories\n\n> Auto-managed by Life Companion. Each entry is a saved memory.\n"
+      );
+    }
+    if (!this.app.vault.getAbstractFileByPath("system/goals.md")) {
+      await this.app.vault.create(
+        "system/goals.md",
+        "# Goals\n\n> Track your life goals here. Managed by Life Companion.\n"
+      );
+    }
+
     // Auto-migrate from old structure
     await this.migrateOldStructure();
   }

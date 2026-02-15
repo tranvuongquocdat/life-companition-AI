@@ -43,6 +43,7 @@ export interface LifeCompanionSettings {
   customModels: Record<string, ModelEntry[]>;
   // Calendar
   calendarEventsDirectory: string;
+  calendarStartDay: 0 | 1 | 6; // 0=Sunday, 1=Monday, 6=Saturday
   // Tabs
   openTabs: string[];
   activeTabId: string | null;
@@ -69,11 +70,15 @@ export const DEFAULT_SETTINGS: LifeCompanionSettings = {
     "get_daily_note", "create_daily_note",
     "check_calendar_status", "get_events", "create_event",
     "update_event", "delete_event", "get_upcoming_events",
+    "save_memory", "recall_memory",
+    "gather_retro_data", "save_retro",
+    "get_goals", "update_goal",
   ],
   language: "en",
   savedConversations: [],
   customModels: {},
   calendarEventsDirectory: "calendar",
+  calendarStartDay: 1, // Monday
   openTabs: [],
   activeTabId: null,
 };
@@ -174,7 +179,7 @@ export interface ToolInfo {
   name: string;
   displayName: string;
   description: string;
-  category: "vault" | "web" | "knowledge" | "graph" | "task" | "daily" | "calendar";
+  category: "vault" | "web" | "knowledge" | "graph" | "task" | "daily" | "calendar" | "memory";
 }
 
 export const ALL_TOOLS: ToolInfo[] = [
@@ -209,6 +214,13 @@ export const ALL_TOOLS: ToolInfo[] = [
   { name: "update_event", displayName: "Update Event", description: "Update an event's properties", category: "calendar" },
   { name: "delete_event", displayName: "Delete Event", description: "Delete a calendar event", category: "calendar" },
   { name: "get_upcoming_events", displayName: "Upcoming Events", description: "Get events for next N days", category: "calendar" },
+  // Memory & Goals
+  { name: "save_memory", displayName: "Save Memory", description: "Save facts, preferences, and context", category: "memory" },
+  { name: "recall_memory", displayName: "Recall Memory", description: "Search or browse saved memories", category: "memory" },
+  { name: "gather_retro_data", displayName: "Gather Retro Data", description: "Collect data for retrospective", category: "memory" },
+  { name: "save_retro", displayName: "Save Retro", description: "Save a retrospective review", category: "memory" },
+  { name: "get_goals", displayName: "Get Goals", description: "Read current goals", category: "memory" },
+  { name: "update_goal", displayName: "Update Goal", description: "Update goal status and progress", category: "memory" },
 ];
 
 export const TOOL_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(

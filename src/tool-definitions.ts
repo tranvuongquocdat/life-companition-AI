@@ -394,3 +394,74 @@ export const WEB_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+export const MEMORY_TOOLS: ToolDefinition[] = [
+  {
+    name: "save_memory",
+    description: "Save an important fact, preference, emotional context, or insight about the user. Use proactively when user shares personal info.",
+    input_schema: {
+      type: "object",
+      properties: {
+        content: { type: "string", description: "The memory to save. Be specific and concise." },
+        type: { type: "string", description: "Memory type: fact, preference, context, or emotional. Default: fact" },
+      },
+      required: ["content"],
+    },
+  },
+  {
+    name: "recall_memory",
+    description: "Recall saved memories about the user. Search by keyword or get recent entries.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Keyword to search. Omit for recent entries." },
+        days: { type: "number", description: "Only memories from last N days." },
+        limit: { type: "number", description: "Max entries to return. Default: 10." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "gather_retro_data",
+    description: "Gather data for a retrospective. Reads daily notes, events, tasks, memories in date range.",
+    input_schema: {
+      type: "object",
+      properties: {
+        startDate: { type: "string", description: "Start date YYYY-MM-DD" },
+        endDate: { type: "string", description: "End date YYYY-MM-DD" },
+      },
+      required: ["startDate", "endDate"],
+    },
+  },
+  {
+    name: "save_retro",
+    description: "Save a retrospective to system/retro/YYYY-MM-DD-{period}.md.",
+    input_schema: {
+      type: "object",
+      properties: {
+        period: { type: "string", description: "Period: weekly, monthly, quarterly" },
+        content: { type: "string", description: "Full retrospective markdown" },
+      },
+      required: ["period", "content"],
+    },
+  },
+  {
+    name: "get_goals",
+    description: "Read all goals from system/goals.md.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "update_goal",
+    description: "Update a goal in system/goals.md, or add new one. Ask user first.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Goal title to find/create" },
+        status: { type: "string", description: "In Progress | On Track | Behind | Completed" },
+        progress: { type: "string", description: "Progress description" },
+        target: { type: "string", description: "Target date" },
+      },
+      required: ["title"],
+    },
+  },
+];

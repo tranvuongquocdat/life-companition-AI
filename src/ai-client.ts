@@ -571,6 +571,23 @@ export class AIClient {
         case "get_upcoming_events":
           if (!calendarManager) return "Calendar manager not available.";
           return await calendarManager.getUpcomingEvents((input.days as number) || 7);
+        // Memory & Goals tools
+        case "save_memory":
+          return await vaultTools.saveMemory(input.content as string, input.type as string);
+        case "recall_memory":
+          return await vaultTools.recallMemory(input.query as string, input.days as number, input.limit as number);
+        case "gather_retro_data":
+          return await vaultTools.gatherRetroData(input.startDate as string, input.endDate as string);
+        case "save_retro":
+          return await vaultTools.saveRetro(input.period as string, input.content as string);
+        case "get_goals":
+          return await vaultTools.getGoals();
+        case "update_goal":
+          return await vaultTools.updateGoal(input.title as string, {
+            status: input.status as string,
+            progress: input.progress as string,
+            target: input.target as string,
+          });
         default:
           return `Unknown tool: ${name}`;
       }

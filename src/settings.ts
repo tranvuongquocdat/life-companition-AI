@@ -1,7 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting, requestUrl } from "obsidian";
 import type LifeCompanionPlugin from "./main";
 import { ALL_TOOLS, MODEL_GROUPS, getEffectiveModelGroups, type AIModel, type AIProvider } from "./types";
-import { VAULT_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, WEB_TOOLS } from "./tool-definitions";
+import { VAULT_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, WEB_TOOLS, MEMORY_TOOLS } from "./tool-definitions";
 import { readClaudeCodeCredentials } from "./auth";
 import { getI18n, type I18n, type Language } from "./i18n";
 
@@ -88,6 +88,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
     this.renderToolSection(containerEl, "Daily Notes Tools", ALL_TOOLS.filter((t) => t.category === "daily"));
     this.renderToolSection(containerEl, "Calendar Tools", ALL_TOOLS.filter((t) => t.category === "calendar"));
     this.renderToolSection(containerEl, "Web Tools", ALL_TOOLS.filter((t) => t.category === "web"));
+    this.renderToolSection(containerEl, "Memory & Goals Tools", ALL_TOOLS.filter((t) => t.category === "memory"));
 
     // ─── Calendar Settings ──────────────────────────────────
     containerEl.createEl("h3", { text: "Calendar" });
@@ -101,6 +102,19 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.calendarEventsDirectory)
           .onChange(async (value) => {
             this.plugin.settings.calendarEventsDirectory = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Week starts on")
+      .setDesc("First day of the week in the calendar view.")
+      .addDropdown((drop) =>
+        drop
+          .addOptions({ "1": "Monday", "0": "Sunday", "6": "Saturday" })
+          .setValue(String(this.plugin.settings.calendarStartDay ?? 1))
+          .onChange(async (value) => {
+            this.plugin.settings.calendarStartDay = Number(value) as 0 | 1 | 6;
             await this.plugin.saveSettings();
           })
       );
@@ -351,7 +365,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
   // ─── Tool Section ──────────────────────────────────────────────
 
   private getToolDetailedDescriptions(): Record<string, string> {
-    const all = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...CALENDAR_TOOLS, ...WEB_TOOLS];
+    const all = [...VAULT_TOOLS, ...KNOWLEDGE_TOOLS, ...GRAPH_TOOLS, ...TASK_TOOLS, ...DAILY_TOOLS, ...CALENDAR_TOOLS, ...WEB_TOOLS, ...MEMORY_TOOLS];
     return Object.fromEntries(all.map((t) => [t.name, t.description]));
   }
 

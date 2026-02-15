@@ -129,6 +129,12 @@ export interface I18n {
   toolUpdatingEvent: string;
   toolDeletingEvent: string;
   toolUpcoming: (days: unknown) => string;
+  toolSavingMemory: string;
+  toolRecalling: (query?: string) => string;
+  toolGatheringRetro: (start: string, end: string) => string;
+  toolSavingRetro: (period: string) => string;
+  toolGettingGoals: string;
+  toolUpdatingGoal: (title: string) => string;
   toolUsing: (name: string) => string;
   toolDone: Record<string, string>;
 }
@@ -251,6 +257,12 @@ const en: I18n = {
   toolUpdatingEvent: "Updating event",
   toolDeletingEvent: "Deleting event",
   toolUpcoming: (d) => `Getting upcoming events (${d} days)`,
+  toolSavingMemory: "Saving memory",
+  toolRecalling: (q) => q ? `Recalling memories about "${q}"` : "Recalling recent memories",
+  toolGatheringRetro: (s, e) => `Gathering retro data ${s} to ${e}`,
+  toolSavingRetro: (p) => `Saving ${p} retrospective`,
+  toolGettingGoals: "Reading goals",
+  toolUpdatingGoal: (t) => `Updating goal: ${t}`,
   toolUsing: (n) => `Using ${n}`,
   toolDone: {
     search_vault: "Searched vault",
@@ -279,6 +291,12 @@ const en: I18n = {
     update_event: "Updated event",
     delete_event: "Deleted event",
     get_upcoming_events: "Got upcoming events",
+    save_memory: "Saved memory",
+    recall_memory: "Recalled memories",
+    gather_retro_data: "Gathered retro data",
+    save_retro: "Saved retrospective",
+    get_goals: "Read goals",
+    update_goal: "Updated goal",
   },
 };
 
@@ -400,6 +418,12 @@ const vi: I18n = {
   toolUpdatingEvent: "Đang cập nhật sự kiện",
   toolDeletingEvent: "Đang xóa sự kiện",
   toolUpcoming: (d) => `Đang lấy sự kiện sắp tới (${d} ngày)`,
+  toolSavingMemory: "Đang lưu memory",
+  toolRecalling: (q) => q ? `Đang tìm memory về "${q}"` : "Đang lấy memory gần đây",
+  toolGatheringRetro: (s, e) => `Đang thu thập dữ liệu retro ${s} đến ${e}`,
+  toolSavingRetro: (p) => `Đang lưu retro ${p}`,
+  toolGettingGoals: "Đang đọc mục tiêu",
+  toolUpdatingGoal: (t) => `Đang cập nhật mục tiêu: ${t}`,
   toolUsing: (n) => `Đang dùng ${n}`,
   toolDone: {
     search_vault: "Đã tìm xong",
@@ -428,6 +452,12 @@ const vi: I18n = {
     update_event: "Đã cập nhật sự kiện",
     delete_event: "Đã xóa sự kiện",
     get_upcoming_events: "Đã lấy sự kiện sắp tới",
+    save_memory: "Đã lưu memory",
+    recall_memory: "Đã lấy memory",
+    gather_retro_data: "Đã thu thập dữ liệu retro",
+    save_retro: "Đã lưu retro",
+    get_goals: "Đã đọc mục tiêu",
+    update_goal: "Đã cập nhật mục tiêu",
   },
 };
 
