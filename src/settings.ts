@@ -383,8 +383,8 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
     if (isCollapsed) body.addClass("lc-collapsed");
 
     header.addEventListener("click", () => {
-      this.collapsed[provider] = !this.collapsed[provider];
-      const nowCollapsed = this.collapsed[provider];
+      const nowCollapsed = !(this.collapsed[provider] ?? true);
+      this.collapsed[provider] = nowCollapsed;
       body.toggleClass("lc-collapsed", nowCollapsed);
       arrow.textContent = nowCollapsed ? "\u25B8" : "\u25BE";
     });
@@ -622,8 +622,8 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
     if (isCollapsed) body.addClass("lc-collapsed");
 
     header.addEventListener("click", () => {
-      this.collapsed[collapseKey] = !this.collapsed[collapseKey];
-      const nowCollapsed = this.collapsed[collapseKey];
+      const nowCollapsed = !(this.collapsed[collapseKey] ?? true);
+      this.collapsed[collapseKey] = nowCollapsed;
       body.toggleClass("lc-collapsed", nowCollapsed);
       arrow.textContent = nowCollapsed ? "\u25B8" : "\u25BE";
     });
