@@ -116,46 +116,41 @@ Want to chat with your vault from your phone? Run the server on a home PC (or an
 - **Evening recaps** — Review what you accomplished today
 - **Smart reminders** — AI-planned notifications before events
 
-### 1. Create a Telegram Bot
+### Quick Setup (2 steps)
+
+**Step 1 — Server** (run on your home PC / any Linux machine):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tranvuongquocdat/life-companition-AI/main/scripts/setup.sh | bash
+```
+
+The script installs Docker + Syncthing, asks for your Telegram bot token & chat ID, builds and starts the server. At the end it prints a **Device ID**.
+
+**Step 2 — Connect vault** (in Obsidian on your laptop):
+
+Go to **Settings → Life Companion → Vault Sync**, paste the Device ID, click **Connect**. Your vault starts syncing automatically.
+
+That's it — chat with your bot on Telegram.
+
+### Create a Telegram Bot (before Step 1)
 
 1. Open Telegram, find **@BotFather**
 2. Send `/newbot`, choose a name and username
 3. Copy the bot token (looks like `7123456789:AAF-abc123...`)
-4. Send any message to your new bot (e.g. "hi")
-5. Open in browser: `https://api.telegram.org/bot<TOKEN>/getUpdates`
-6. Find `"chat":{"id":123456789}` — that's your Chat ID
+4. Send any message to your new bot, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` to find your Chat ID
 
-### 2. Deploy with Docker (Recommended)
+### Manual Setup
+
+If you prefer manual control over the automated script:
 
 ```bash
 git clone https://github.com/tranvuongquocdat/life-companition-AI.git
 cd life-companition-AI
-cp .env.example .env
-```
-
-Edit `.env`:
-```
-TELEGRAM_BOT_TOKEN=<token from BotFather>
-TELEGRAM_CHAT_ID=<your chat ID>
-VAULT_PATH=/data/vault
-CLAUDE_API_KEY=<your key>
-```
-
-Run:
-```bash
+cp .env.example .env   # Edit with your tokens and keys
 docker compose up -d
 ```
 
-The vault is mounted at `./data/vault` — point [Syncthing](https://syncthing.net/) or copy your Obsidian vault there to give the bot access to your notes.
-
-### 3. Deploy without Docker
-
-```bash
-npm run build:server
-npm run start:server
-```
-
-See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full setup guide and [docs/plans/2026-02-18-home-pc-server-setup.md](docs/plans/2026-02-18-home-pc-server-setup.md) for home PC deployment with Syncthing.
+See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full details.
 
 ## Development
 

@@ -7,6 +7,7 @@ import {
   type AIModel, type AIProvider, type I18n, type Language,
 } from "@life-companion/core";
 import { readClaudeCodeCredentials } from "./auth";
+import { SyncthingClient } from "./syncthing";
 
 export class LifeCompanionSettingTab extends PluginSettingTab {
   plugin: LifeCompanionPlugin;
@@ -186,6 +187,163 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             })
         );
+    }
+
+    // ─── Vault Sync ──────────────────────────────────────────────
+    containerEl.createEl("h3", { text: "Vault Sync" });
+    containerEl.createEl("p", {
+      text: "Sync your vault with a server for Telegram bot, scheduled briefings, and mobile access.",
+      cls: "setting-item-description",
+    });
+
+    this.renderSyncSection(containerEl);
+  }
+
+  // ─── Vault Sync Section ────────────────────────────────────────
+
+  private renderSyncSection(containerEl: HTMLElement) {
+    const syncthing = new SyncthingClient();
+    const statusEl = containerEl.createDiv({ cls: "lc-sync-status" });
+
+    // Check Syncthing status async
+    this.checkSyncStatus(syncthing, containerEl, statusEl);
+  }
+
+  private async checkSyncStatus(syncthing: SyncthingClient, containerEl: HTMLElement, statusEl: HTMLElement) {
+    statusEl.empty();
+
+    const running = await syncthing.isRunning();
+
+    if (!running) {
+      // Syncthing not detected
+      const installCmd = SyncthingClient.getInstallCommand();
+
+      new Setting(statusEl)
+        .setName("Syncthing")
+        .setDesc("Not detected — install Syncthing to enable vault sync.")
+        .addButton((btn) =>
+          btn.setButtonText("How to install").onClick(() => {
+            const modal = statusEl.createDiv({ cls: "lc-install-info" });
+            modal.createEl("p", { text: "Run this in your terminal:" });
+            const code = modal.createEl("code");
+            code.textContent = installCmd;
+            code.style.display = "block";
+            code.style.padding = "8px";
+            code.style.marginTop = "4px";
+            code.style.userSelect = "all";
+            modal.createEl("p", { text: "Then restart Obsidian and come back here." });
+            btn.setDisabled(true);
+          })
+        );
+
+      new Setting(statusEl)
+        .setName("")
+        .addButton((btn) =>
+          btn.setButtonText("Re-check").onClick(() => {
+            this.display();
+          })
+        );
+      return;
+    }
+
+    // Syncthing is running — load API key
+    const hasKey = await syncthing.loadApiKey();
+    if (!hasKey) {
+      new Setting(statusEl)
+        .setName("Syncthing")
+        .setDesc("Running but could not read API key. Check Syncthing config.xml permissions.");
+      return;
+    }
+
+    // Connected to Syncthing
+    if (this.plugin.settings.syncEnabled && this.plugin.settings.syncDeviceId) {
+      // Already configured — show status
+      const folderStatus = await syncthing.getFolderStatus("lc-vault");
+      const stateText = folderStatus
+        ? `${folderStatus.state} · ${folderStatus.globalFiles} files`
+        : "Checking...";
+
+      new Setting(statusEl)
+        .setName("Syncthing")
+        .setDesc(`Connected · ${stateText}`)
+        .addButton((btn) =>
+          btn.setButtonText("Disconnect").onClick(async () => {
+            this.plugin.settings.syncDeviceId = "";
+            this.plugin.settings.syncEnabled = false;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        )
+        .addButton((btn) =>
+          btn.setButtonText("Refresh").onClick(() => {
+            this.display();
+          })
+        );
+    } else {
+      // Not configured — show connect form
+      new Setting(statusEl)
+        .setName("Syncthing")
+        .setDesc("Running — enter the Server Device ID to connect.");
+
+      let deviceIdValue = "";
+      new Setting(statusEl)
+        .setName("Server Device ID")
+        .setDesc("Shown at the end of the server setup script")
+        .addText((text) =>
+          text
+            .setPlaceholder("XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX")
+            .onChange((v) => { deviceIdValue = v; })
+        )
+        .addButton((btn) =>
+          btn.setButtonText("Connect").setCta().onClick(async () => {
+            const id = deviceIdValue.trim();
+            if (!id) { new Notice("Enter the Server Device ID first"); return; }
+
+            btn.setButtonText("Connecting...");
+            btn.setDisabled(true);
+
+            // Add device
+            const added = await syncthing.addDevice(id, "Life Companion Server");
+            if (!added) {
+              new Notice("Failed to add device. Check the Device ID and try again.");
+              btn.setButtonText("Connect");
+              btn.setDisabled(false);
+              return;
+            }
+
+            // Get vault path from Obsidian
+            const vaultPath = (this.app.vault.adapter as any).getBasePath?.()
+              || (this.app.vault.adapter as any).basePath || "";
+
+            if (!vaultPath) {
+              new Notice("Could not detect vault path");
+              btn.setButtonText("Connect");
+              btn.setDisabled(false);
+              return;
+            }
+
+            // Share folder
+            const shared = await syncthing.shareFolder("lc-vault", vaultPath, id);
+            if (!shared) {
+              new Notice("Failed to configure sync folder. Check Syncthing web UI.");
+              btn.setButtonText("Connect");
+              btn.setDisabled(false);
+              return;
+            }
+
+            // Save settings
+            this.plugin.settings.syncDeviceId = id;
+            this.plugin.settings.syncEnabled = true;
+            await this.plugin.saveSettings();
+            new Notice("Vault sync configured! Syncing will start shortly.");
+            this.display();
+          })
+        );
+
+      // Server setup link
+      containerEl.createEl("p", {
+        cls: "setting-item-description",
+      }).innerHTML = 'Need a server? Run <code>curl -fsSL https://raw.githubusercontent.com/tranvuongquocdat/life-companition-AI/main/scripts/setup.sh | bash</code> on your server machine. <a href="https://github.com/tranvuongquocdat/life-companition-AI#telegram-bot--server-optional">Setup guide</a>';
     }
   }
 

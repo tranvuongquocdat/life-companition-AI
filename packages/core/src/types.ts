@@ -49,6 +49,9 @@ export interface LifeCompanionSettings {
   // Snapshots
   snapshotsEnabled: boolean;
   maxSnapshotsPerFile: number;
+  // Vault Sync (Syncthing)
+  syncDeviceId: string;      // Remote server's Syncthing Device ID
+  syncEnabled: boolean;       // Whether sync is configured and active
   // Tabs
   openTabs: string[];
   activeTabId: string | null;
@@ -88,6 +91,8 @@ export const DEFAULT_SETTINGS: LifeCompanionSettings = {
   calendarStartDay: 1, // Monday
   snapshotsEnabled: true,
   maxSnapshotsPerFile: 3,
+  syncDeviceId: "",
+  syncEnabled: false,
   openTabs: [],
   activeTabId: null,
 };
