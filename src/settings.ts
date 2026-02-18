@@ -270,9 +270,18 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
     if (this.plugin.settings.syncEnabled && this.plugin.settings.syncDeviceId) {
       // Already configured — show status
       const folderStatus = await syncthing.getFolderStatus("lc-vault");
-      const stateText = folderStatus
-        ? `${folderStatus.state} · ${folderStatus.globalFiles} files`
-        : "Checking...";
+      let stateText = "Checking...";
+      if (folderStatus) {
+        const stateMap: Record<string, string> = {
+          idle: "Up to date",
+          scanning: "Scanning files...",
+          syncing: "Syncing...",
+          error: "Error",
+          "sync-preparing": "Preparing sync...",
+        };
+        const label = stateMap[folderStatus.state] || folderStatus.state;
+        stateText = `${label} · ${folderStatus.globalFiles} files`;
+      }
 
       new Setting(statusEl)
         .setName("Syncthing")
