@@ -1,6 +1,6 @@
-# Life Companition AI — Your AI Assistant Inside Obsidian
+# Life Companion AI — Your AI Assistant Inside Obsidian
 
-Turn your Obsidian vault into a personal life management system. Life Companition AI is an AI-powered plugin that lives right inside your notes — it can read, search, organize your vault, manage your calendar, and have meaningful conversations that actually understand your life context.
+Turn your Obsidian vault into a personal life management system. Life Companion AI is an AI-powered plugin that lives right inside your notes — it can read, search, organize your vault, manage your calendar, and have meaningful conversations that actually understand your life context.
 
 ## What Can It Do?
 
@@ -39,7 +39,7 @@ Full English and Vietnamese support — including all tool activity descriptions
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from Community Plugins
 2. In BRAT settings, click "Add Beta Plugin"
 3. Paste: `tranvuongquocdat/life-companition-AI`
-4. Enable "Life Companition AI" in Community Plugins
+4. Enable "Life Companion AI" in Community Plugins
 
 BRAT will auto-update the plugin when new releases are published.
 
@@ -48,7 +48,7 @@ BRAT will auto-update the plugin when new releases are published.
 1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/tranvuongquocdat/life-companition-AI/releases/latest)
 2. Create folder: `your-vault/.obsidian/plugins/life-companion/`
 3. Copy the 3 files into that folder
-4. In Obsidian: Settings → Community Plugins → Enable "Life Companition AI"
+4. In Obsidian: Settings → Community Plugins → Enable "Life Companion AI"
 
 ### Build from Source (Developers)
 
@@ -63,7 +63,7 @@ See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full developer setup.
 
 ### Set Up an AI Provider
 
-Go to **Settings → Life Companition AI** and add at least one API key:
+Go to **Settings → Life Companion AI** and add at least one API key:
 
 | Provider | Where to get a key |
 |----------|-------------------|
@@ -76,7 +76,7 @@ Go to **Settings → Life Companition AI** and add at least one API key:
 
 ### Start Chatting
 
-Click the Life Companition AI icon in the sidebar (or use the command palette). That's it — start typing and the AI will respond with full awareness of your vault.
+Click the Life Companion AI icon in the sidebar (or use the command palette). That's it — start typing and the AI will respond with full awareness of your vault.
 
 ## How the AI Works With Your Vault
 

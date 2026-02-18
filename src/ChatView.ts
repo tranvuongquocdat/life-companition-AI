@@ -93,7 +93,7 @@ export class ChatView extends ItemView {
   }
 
   getDisplayText(): string {
-    return this.conversation?.title || "Life Companition AI";
+    return this.conversation?.title || "Life Companion AI";
   }
 
   getIcon(): string {
@@ -254,6 +254,10 @@ export class ChatView extends ItemView {
   }
 
   async onClose() {
+    if (this.thinkingTimerInterval) {
+      clearInterval(this.thinkingTimerInterval);
+      this.thinkingTimerInterval = null;
+    }
     if (this.conversation.messages.length > 0) {
       this.plugin.saveConversation(this.conversation);
     }
@@ -1455,7 +1459,7 @@ export class ChatView extends ItemView {
     this.createNewTab();
   }
 
-  // ─── Send Message ─────────────────────────────────────────────
+  // ─── Send Message ──────────���──────────────────────────────────
 
   private async handleSend() {
     const text = this.inputEl.value.trim();

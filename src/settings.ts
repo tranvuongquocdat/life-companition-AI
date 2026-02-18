@@ -361,9 +361,11 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
         );
 
       // Server setup link
-      containerEl.createEl("p", {
-        cls: "setting-item-description",
-      }).innerHTML = 'Need a server? Run <code>curl -fsSL https://raw.githubusercontent.com/tranvuongquocdat/life-companition-AI/main/scripts/setup.sh | bash</code> on your server machine. <a href="https://github.com/tranvuongquocdat/life-companition-AI#telegram-bot--server-optional">Setup guide</a>';
+      const serverHint = containerEl.createEl("p", { cls: "setting-item-description" });
+      serverHint.appendText("Need a server? Run ");
+      serverHint.createEl("code", { text: "curl -fsSL https://raw.githubusercontent.com/tranvuongquocdat/life-companition-AI/main/scripts/setup.sh | bash" });
+      serverHint.appendText(" on your server machine. ");
+      serverHint.createEl("a", { text: "Setup guide", href: "https://github.com/tranvuongquocdat/life-companition-AI#telegram-bot--server-optional" });
     }
   }
 

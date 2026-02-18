@@ -5,7 +5,7 @@ const INDEX_PATH = "system/index.md";
 
 const DEFAULT_PROFILE = `# Profile
 
-> Life Companition AI sẽ giúp bạn điền profile này qua các cuộc trò chuyện.
+> Life Companion AI sẽ giúp bạn điền profile này qua các cuộc trò chuyện.
 
 ## Về bạn
 - Tên:
@@ -110,13 +110,13 @@ export class ProfileManager {
     if (!this.app.vault.getAbstractFileByPath("system/memories.md")) {
       await this.app.vault.create(
         "system/memories.md",
-        "# Memories\n\n> Auto-managed by Life Companition AI. Each entry is a saved memory.\n"
+        "# Memories\n\n> Auto-managed by Life Companion AI. Each entry is a saved memory.\n"
       );
     }
     if (!this.app.vault.getAbstractFileByPath("system/goals.md")) {
       await this.app.vault.create(
         "system/goals.md",
-        "# Goals\n\n> Track your life goals here. Managed by Life Companition AI.\n"
+        "# Goals\n\n> Track your life goals here. Managed by Life Companion AI.\n"
       );
     }
 

@@ -108,7 +108,7 @@ import { TokenManager, buildAuthConfig } from "./auth";
   });
 
   app.listen(config.port, () => {
-    console.log(`Life Companition AI Server running on port ${config.port}`);
+    console.log(`Life Companion AI Server running on port ${config.port}`);
     console.log(`Vault: ${config.vaultPath}`);
     console.log(`Model: ${config.defaultModel}`);
     console.log(`Telegram bot active, chat ID: ${config.telegramChatId}`);

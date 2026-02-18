@@ -26,8 +26,8 @@
 
 4. In Obsidian:
    - Open your vault
-   - Settings → Community plugins → Enable "Life Companition AI"
-   - Settings → Life Companition AI → Add an API key
+   - Settings → Community plugins → Enable "Life Companion AI"
+   - Settings → Life Companion AI → Add an API key
    - Optional: Install [hot-reload](https://github.com/pjeby/hot-reload) plugin
 
 ## Development Cycle

@@ -847,7 +847,7 @@ export class VaultTools {
     if (file && file instanceof TFile) {
       await this.app.vault.append(file, entry);
     } else {
-      const header = "# Memories\n\n> Auto-managed by Life Companition AI. Each entry is a saved memory.\n";
+      const header = "# Memories\n\n> Auto-managed by Life Companion AI. Each entry is a saved memory.\n";
       await this.app.vault.create(this.MEMORIES_PATH, header + entry);
     }
     // Add to vector store + embed inline
@@ -1046,7 +1046,7 @@ export class VaultTools {
     if (!file || !(file instanceof TFile)) {
       const newGoal = `## \u{1F3AF} ${title}\n- Target: ${updates.target || "TBD"}\n- Status: ${updates.status || "In Progress"}\n- Progress: ${updates.progress || "(no progress notes yet)"}\n- Last updated: ${dateStr}\n`;
       const header =
-        "# Goals\n\n> Track your life goals here. Managed by Life Companition AI.\n\n";
+        "# Goals\n\n> Track your life goals here. Managed by Life Companion AI.\n\n";
       await this.app.vault.create(this.GOALS_PATH, header + newGoal);
       return `Created goals file with goal: ${title}`;
     }

@@ -81,13 +81,13 @@ export default class LifeCompanionPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
-    this.addRibbonIcon("message-circle", "Life Companition AI", () => {
+    this.addRibbonIcon("message-circle", "Life Companion AI", () => {
       this.activateView();
     });
 
     this.addCommand({
       id: "open-chat",
-      name: "Open Life Companition AI",
+      name: "Open Life Companion AI",
       callback: () => this.activateView(),
     });
 
@@ -463,7 +463,7 @@ export default class LifeCompanionPlugin extends Plugin {
       view.stopStreaming();
       const msg = error instanceof Error ? error.message : "Unknown error";
       view.addAssistantMessage(t.error(msg));
-      new Notice(`Life Companition AI: ${msg}`);
+      new Notice(`Life Companion AI: ${msg}`);
     }
   }
 
