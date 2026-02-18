@@ -25,6 +25,7 @@ export class VaultTools {
   private readonly SNAPSHOTS_DIR = "system/snapshots";
   private snapshotsEnabled = true;
   private maxSnapshotsPerFile = 3;
+  private braveSearchApiKey = "";
 
   constructor(private app: App) {}
 
@@ -38,6 +39,10 @@ export class VaultTools {
   setSnapshotConfig(enabled: boolean, maxPerFile: number) {
     this.snapshotsEnabled = enabled;
     this.maxSnapshotsPerFile = maxPerFile;
+  }
+
+  setBraveSearchApiKey(key: string) {
+    this.braveSearchApiKey = key;
   }
 
   // ─── Snapshot Backup ─────────────────────────────────────────
@@ -702,6 +707,56 @@ export class VaultTools {
   // ─── Web Tools ────────────────────────────────────────────────
 
   async webSearch(query: string): Promise<string> {
+    if (this.braveSearchApiKey) {
+      try {
+        return await this.braveSearch(query);
+      } catch (e) {
+        // Fallback to DuckDuckGo on Brave failure (quota exceeded, invalid key, etc.)
+        console.warn("Brave Search failed, falling back to DuckDuckGo:", (e as Error).message);
+      }
+    }
+    return this.duckDuckGoSearch(query);
+  }
+
+  private async braveSearch(query: string): Promise<string> {
+    const params = new URLSearchParams({
+      q: query,
+      count: "8",
+      text_decorations: "false",
+    });
+
+    const response = await requestUrl({
+      url: `https://api.search.brave.com/res/v1/web/search?${params}`,
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+        "X-Subscription-Token": this.braveSearchApiKey,
+      },
+      throw: false,
+    });
+
+    if (response.status !== 200) {
+      throw new Error(`Brave API error: HTTP ${response.status}`);
+    }
+
+    const data = response.json;
+    const results: string[] = [];
+
+    if (data.web?.results) {
+      for (let i = 0; i < Math.min(data.web.results.length, 8); i++) {
+        const r = data.web.results[i];
+        const snippet = r.description || "";
+        results.push(`${i + 1}. **${r.title}**\n   ${r.url}\n   ${snippet}`);
+      }
+    }
+
+    return results.length > 0
+      ? results.join("\n\n")
+      : `No results found for "${query}".`;
+  }
+
+  private async duckDuckGoSearch(query: string): Promise<string> {
     const response = await requestUrl({
       url: "https://html.duckduckgo.com/html/",
       method: "POST",
@@ -712,7 +767,6 @@ export class VaultTools {
     const html = response.text;
     const results: string[] = [];
 
-    // Extract result links
     const linkRegex = /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g;
     const snippetRegex = /<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
 
@@ -793,7 +847,7 @@ export class VaultTools {
     if (file && file instanceof TFile) {
       await this.app.vault.append(file, entry);
     } else {
-      const header = "# Memories\n\n> Auto-managed by Life Companion. Each entry is a saved memory.\n";
+      const header = "# Memories\n\n> Auto-managed by Life Companition AI. Each entry is a saved memory.\n";
       await this.app.vault.create(this.MEMORIES_PATH, header + entry);
     }
     // Add to vector store + embed inline
@@ -992,7 +1046,7 @@ export class VaultTools {
     if (!file || !(file instanceof TFile)) {
       const newGoal = `## \u{1F3AF} ${title}\n- Target: ${updates.target || "TBD"}\n- Status: ${updates.status || "In Progress"}\n- Progress: ${updates.progress || "(no progress notes yet)"}\n- Last updated: ${dateStr}\n`;
       const header =
-        "# Goals\n\n> Track your life goals here. Managed by Life Companion.\n\n";
+        "# Goals\n\n> Track your life goals here. Managed by Life Companition AI.\n\n";
       await this.app.vault.create(this.GOALS_PATH, header + newGoal);
       return `Created goals file with goal: ${title}`;
     }

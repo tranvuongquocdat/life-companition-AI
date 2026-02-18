@@ -7,7 +7,9 @@ services:
       - "3456:3456"
     volumes:
       - ./data/vault:/data/vault
+      - ~/.claude/.credentials.json:/app/.claude-credentials.json
     env_file:
       - .env
     environment:
       - TZ=Asia/Ho_Chi_Minh
+      - CLAUDE_CREDENTIALS_PATH=/app/.claude-credentials.json

@@ -29,6 +29,7 @@ export class ServerVaultTools {
   private readonly SNAPSHOTS_DIR = "system/snapshots";
   private snapshotsEnabled = true;
   private maxSnapshotsPerFile = 3;
+  private braveSearchApiKey = "";
 
   constructor(private vaultPath: string) {}
 
@@ -42,6 +43,10 @@ export class ServerVaultTools {
   setSnapshotConfig(enabled: boolean, maxPerFile: number) {
     this.snapshotsEnabled = enabled;
     this.maxSnapshotsPerFile = maxPerFile;
+  }
+
+  setBraveSearchApiKey(key: string) {
+    this.braveSearchApiKey = key;
   }
 
   private resolve(p: string): string {
@@ -744,6 +749,53 @@ export class ServerVaultTools {
   // ─── Web Tools ────────────────────────────────────────────────
 
   async webSearch(query: string): Promise<string> {
+    if (this.braveSearchApiKey) {
+      try {
+        return await this.braveSearch(query);
+      } catch (e) {
+        console.warn("Brave Search failed, falling back to DuckDuckGo:", (e as Error).message);
+      }
+    }
+    return this.duckDuckGoSearch(query);
+  }
+
+  private async braveSearch(query: string): Promise<string> {
+    const params = new URLSearchParams({
+      q: query,
+      count: "8",
+      text_decorations: "false",
+    });
+
+    const res = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+        "X-Subscription-Token": this.braveSearchApiKey,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Brave API error: HTTP ${res.status}`);
+    }
+
+    const data = await res.json() as any;
+    const results: string[] = [];
+
+    if (data.web?.results) {
+      for (let i = 0; i < Math.min(data.web.results.length, 8); i++) {
+        const r = data.web.results[i];
+        const snippet = r.description || "";
+        results.push(`${i + 1}. **${r.title}**\n   ${r.url}\n   ${snippet}`);
+      }
+    }
+
+    return results.length > 0
+      ? results.join("\n\n")
+      : `No results found for "${query}".`;
+  }
+
+  private async duckDuckGoSearch(query: string): Promise<string> {
     const res = await fetch("https://html.duckduckgo.com/html/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -853,7 +905,7 @@ export class ServerVaultTools {
     if (existing !== null) {
       await this.writeVaultFile(this.MEMORIES_PATH, existing + entry);
     } else {
-      const header = "# Memories\n\n> Auto-managed by Life Companion. Each entry is a saved memory.\n";
+      const header = "# Memories\n\n> Auto-managed by Life Companition AI. Each entry is a saved memory.\n";
       await this.writeVaultFile(this.MEMORIES_PATH, header + entry);
     }
 
@@ -1037,7 +1089,7 @@ export class ServerVaultTools {
 
     if (content === null) {
       const newGoal = `## \u{1F3AF} ${title}\n- Target: ${updates.target || "TBD"}\n- Status: ${updates.status || "In Progress"}\n- Progress: ${updates.progress || "(no progress notes yet)"}\n- Last updated: ${dateStr}\n`;
-      const header = "# Goals\n\n> Track your life goals here. Managed by Life Companion.\n\n";
+      const header = "# Goals\n\n> Track your life goals here. Managed by Life Companition AI.\n\n";
       await this.writeVaultFile(this.GOALS_PATH, header + newGoal);
       return `Created goals file with goal: ${title}`;
     }

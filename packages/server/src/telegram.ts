@@ -56,7 +56,7 @@ export class TelegramBotHandler {
   private setupHandlers() {
     this.bot.onText(/\/start/, (msg: TelegramBot.Message) => {
       if (msg.chat.id.toString() !== this.config.telegramChatId) return;
-      this.bot.sendMessage(msg.chat.id, "Life Companion bot is active! Send me any message to chat.");
+      this.bot.sendMessage(msg.chat.id, "Life Companition AI bot is active! Send me any message to chat.");
     });
 
     this.bot.onText(/\/new/, (msg: TelegramBot.Message) => {

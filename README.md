@@ -1,6 +1,6 @@
-# Life Companion — Your AI Assistant Inside Obsidian
+# Life Companition AI — Your AI Assistant Inside Obsidian
 
-Turn your Obsidian vault into a personal life management system. Life Companion is an AI-powered plugin that lives right inside your notes — it can read, search, organize your vault, manage your calendar, and have meaningful conversations that actually understand your life context.
+Turn your Obsidian vault into a personal life management system. Life Companition AI is an AI-powered plugin that lives right inside your notes — it can read, search, organize your vault, manage your calendar, and have meaningful conversations that actually understand your life context.
 
 ## What Can It Do?
 
@@ -39,7 +39,7 @@ Full English and Vietnamese support — including all tool activity descriptions
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from Community Plugins
 2. In BRAT settings, click "Add Beta Plugin"
 3. Paste: `tranvuongquocdat/life-companition-AI`
-4. Enable "Life Companion" in Community Plugins
+4. Enable "Life Companition AI" in Community Plugins
 
 BRAT will auto-update the plugin when new releases are published.
 
@@ -48,7 +48,7 @@ BRAT will auto-update the plugin when new releases are published.
 1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/tranvuongquocdat/life-companition-AI/releases/latest)
 2. Create folder: `your-vault/.obsidian/plugins/life-companion/`
 3. Copy the 3 files into that folder
-4. In Obsidian: Settings → Community Plugins → Enable "Life Companion"
+4. In Obsidian: Settings → Community Plugins → Enable "Life Companition AI"
 
 ### Build from Source (Developers)
 
@@ -63,7 +63,7 @@ See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full developer setup.
 
 ### Set Up an AI Provider
 
-Go to **Settings → Life Companion** and add at least one API key:
+Go to **Settings → Life Companition AI** and add at least one API key:
 
 | Provider | Where to get a key |
 |----------|-------------------|
@@ -76,7 +76,7 @@ Go to **Settings → Life Companion** and add at least one API key:
 
 ### Start Chatting
 
-Click the Life Companion icon in the sidebar (or use the command palette). That's it — start typing and the AI will respond with full awareness of your vault.
+Click the Life Companition AI icon in the sidebar (or use the command palette). That's it — start typing and the AI will respond with full awareness of your vault.
 
 ## How the AI Works With Your Vault
 
@@ -107,23 +107,55 @@ The AI can perform **20+ actions** on your vault, all toggleable in settings:
 
 The AI is designed to be honest about its actions — if it claims it saved or created something, it actually called the tool. If something goes wrong, you'll see a warning instead of a false confirmation.
 
-## Telegram Bot (Optional)
+## Telegram Bot + Server (Optional)
 
-Want to chat with your vault from your phone? The optional server package adds:
+Want to chat with your vault from your phone? Run the server on a home PC (or any machine) to get:
 
 - **Telegram bot** — Chat with your AI companion from anywhere
 - **Morning briefings** — Auto-summary of today's events, tasks, and goals
 - **Evening recaps** — Review what you accomplished today
 - **Smart reminders** — AI-planned notifications before events
 
-Setup:
+### 1. Create a Telegram Bot
+
+1. Open Telegram, find **@BotFather**
+2. Send `/newbot`, choose a name and username
+3. Copy the bot token (looks like `7123456789:AAF-abc123...`)
+4. Send any message to your new bot (e.g. "hi")
+5. Open in browser: `https://api.telegram.org/bot<TOKEN>/getUpdates`
+6. Find `"chat":{"id":123456789}` — that's your Chat ID
+
+### 2. Deploy with Docker (Recommended)
+
 ```bash
-cd packages/server && npm install
-cp .env.example .env  # Configure tokens
+git clone https://github.com/tranvuongquocdat/life-companition-AI.git
+cd life-companition-AI
+cp .env.example .env
+```
+
+Edit `.env`:
+```
+TELEGRAM_BOT_TOKEN=<token from BotFather>
+TELEGRAM_CHAT_ID=<your chat ID>
+VAULT_PATH=/data/vault
+CLAUDE_API_KEY=<your key>
+```
+
+Run:
+```bash
+docker-compose up -d
+```
+
+The vault is mounted at `./data/vault` — point [Syncthing](https://syncthing.net/) or copy your Obsidian vault there to give the bot access to your notes.
+
+### 3. Deploy without Docker
+
+```bash
+npm run build:server
 npm run start:server
 ```
 
-See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full server setup guide.
+See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full setup guide and [docs/plans/2026-02-18-home-pc-server-setup.md](docs/plans/2026-02-18-home-pc-server-setup.md) for home PC deployment with Syncthing.
 
 ## Development
 

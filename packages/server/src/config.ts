@@ -11,6 +11,10 @@ export interface ServerConfig {
   openaiApiKey?: string;
   geminiApiKey?: string;
   groqApiKey?: string;
+  // Claude Code credentials file (for auto-refresh OAuth tokens)
+  claudeCredentialsPath?: string;
+  // Web search
+  braveSearchApiKey?: string;
   // Scheduling
   morningBriefingHour: number;
   eveningRecapHour: number;
@@ -32,6 +36,8 @@ export function loadConfig(): ServerConfig {
     openaiApiKey: process.env.OPENAI_API_KEY,
     geminiApiKey: process.env.GEMINI_API_KEY,
     groqApiKey: process.env.GROQ_API_KEY,
+    claudeCredentialsPath: process.env.CLAUDE_CREDENTIALS_PATH,
+    braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY,
     morningBriefingHour: parseInt(env("MORNING_HOUR", "7")),
     eveningRecapHour: parseInt(env("EVENING_HOUR", "21")),
     timezone: env("TZ", "Asia/Ho_Chi_Minh"),

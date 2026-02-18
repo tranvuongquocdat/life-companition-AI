@@ -28,6 +28,8 @@ export interface LifeCompanionSettings {
   openaiApiKey: string;
   geminiApiKey: string;
   groqApiKey: string;
+  // Web search
+  braveSearchApiKey: string;
   // Model selection per mode
   quickModel: AIModel;
   diveModel: AIModel;
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: LifeCompanionSettings = {
   openaiApiKey: "",
   geminiApiKey: "",
   groqApiKey: "",
+  braveSearchApiKey: "",
   quickModel: "gemini-3-flash-preview",
   diveModel: "claude-sonnet-4-5",
   enabledModels: ["claude-sonnet-4-5", "gpt-4.1", "gemini-3-flash-preview", "gemini-2.5-flash"],

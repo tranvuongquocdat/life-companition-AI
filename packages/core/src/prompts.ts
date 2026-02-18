@@ -42,7 +42,7 @@ ${briefingContext ? `\n## Daily Briefing\n${briefingContext}` : ""}
 ${modeInstructions}`;
 }
 
-const BASE_PROMPT = `You are Life Companion — an AI companion inside Obsidian.
+const BASE_PROMPT = `You are Life Companition AI — an AI companion inside Obsidian.
 
 ## ABSOLUTE RULE: Tool Verification (NEVER VIOLATE)
 - The ONLY valid flow: call tool → receive tool_result with success → THEN say "Đã tạo/lưu/cập nhật"

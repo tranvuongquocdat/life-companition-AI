@@ -140,7 +140,7 @@ export interface I18n {
 }
 
 const en: I18n = {
-  greeting: "Hi! I'm Life Companion. Send a message, or type `/dive` for deep dive mode.",
+  greeting: "Hi! I'm Life Companition AI. Send a message, or type `/dive` for deep dive mode.",
   thinking: "Thinking",
   deepThinking: "Deep thinking",
   usedTools: (n) => `Used ${n} tool${n > 1 ? "s" : ""}`,
@@ -157,11 +157,11 @@ const en: I18n = {
   hoursAgo: (n) => `${n}h ago`,
   daysAgo: (n) => `${n}d ago`,
   messages: "messages",
-  noApiKey: (p) => `No API key for ${p}. Go to Settings → Life Companion to configure.`,
+  noApiKey: (p) => `No API key for ${p}. Go to Settings → Life Companition AI to configure.`,
   tokenExpired: "Token expired. Please log in again in Settings.",
   error: (msg) => `Error: ${msg}`,
 
-  settingsTitle: "Life Companion Settings",
+  settingsTitle: "Life Companition AI Settings",
   apiProviders: "API Providers",
   defaultModels: "Default Models",
   enabledModels: "Enabled Models",
@@ -301,7 +301,7 @@ const en: I18n = {
 };
 
 const vi: I18n = {
-  greeting: "Chào bạn! Mình là Life Companion. Hãy nhắn gì đó, hoặc gõ `/dive` để vào chế độ deep dive.",
+  greeting: "Chào bạn! Mình là Life Companition AI. Hãy nhắn gì đó, hoặc gõ `/dive` để vào chế độ deep dive.",
   thinking: "Đang xử lý...",
   deepThinking: "Suy nghĩ sâu...",
   usedTools: (n) => `Đã dùng ${n} tool${n > 1 ? "s" : ""}`,
@@ -318,11 +318,11 @@ const vi: I18n = {
   hoursAgo: (n) => `${n} giờ trước`,
   daysAgo: (n) => `${n} ngày trước`,
   messages: "tin nhắn",
-  noApiKey: (p) => `Chưa có API key cho ${p}. Vào Settings → Life Companion để cấu hình.`,
+  noApiKey: (p) => `Chưa có API key cho ${p}. Vào Settings → Life Companition AI để cấu hình.`,
   tokenExpired: "Token hết hạn. Vui lòng đăng nhập lại trong Settings.",
   error: (msg) => `Lỗi: ${msg}`,
 
-  settingsTitle: "Life Companion Settings",
+  settingsTitle: "Life Companition AI Settings",
   apiProviders: "API Providers",
   defaultModels: "Default Models",
   enabledModels: "Enabled Models",

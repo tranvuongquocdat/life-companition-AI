@@ -1,7 +1,7 @@
 {
   "name": "life-companion",
   "version": "0.4.0",
-  "description": "AI life companion Obsidian plugin",
+  "description": "AI life companition Obsidian plugin",
   "main": "main.js",
   "type": "module",
   "workspaces": ["packages/core"],

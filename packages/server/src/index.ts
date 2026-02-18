@@ -7,6 +7,7 @@ import { ServerCalendarManager } from "./calendar-manager";
 import { createToolExecutor } from "./tool-executor";
 import { TelegramBotHandler } from "./telegram";
 import { Scheduler } from "./scheduler";
+import { TokenManager, buildAuthConfig } from "./auth";
 
 (async () => {
   const config = loadConfig();
@@ -18,14 +19,6 @@ import { Scheduler } from "./scheduler";
     console.error(`ERROR: Vault path does not exist: ${config.vaultPath}`);
     console.error("Create the directory or set VAULT_PATH correctly in .env");
     process.exit(1);
-  }
-
-  // Warn if no AI provider configured
-  if (
-    !config.claudeAccessToken && !config.claudeApiKey &&
-    !config.openaiApiKey && !config.geminiApiKey && !config.groqApiKey
-  ) {
-    console.warn("WARNING: No AI provider API key configured. Bot will not be able to respond.");
   }
 
   // HttpClient using native fetch (Node 20+)
@@ -41,14 +34,41 @@ import { Scheduler } from "./scheduler";
     return { status: res.status, text, json };
   };
 
+  // OAuth token auto-refresh (if credentials file available)
+  let tokenManager: TokenManager | null = null;
+  let oauthToken: string | undefined;
+
+  const credPath = config.claudeCredentialsPath
+    || (process.env.HOME ? `${process.env.HOME}/.claude/.credentials.json` : null);
+
+  if (credPath) {
+    tokenManager = new TokenManager(credPath);
+    const token = await tokenManager.load();
+    if (token) {
+      oauthToken = token;
+      console.log("OAuth auto-refresh enabled");
+    }
+  }
+
+  // Warn if no AI provider configured
+  if (
+    !oauthToken && !config.claudeAccessToken && !config.claudeApiKey &&
+    !config.openaiApiKey && !config.geminiApiKey && !config.groqApiKey
+  ) {
+    console.warn("WARNING: No AI provider API key configured. Bot will not be able to respond.");
+  }
+
   // Initialize AI client
-  const aiClient = new AIClient({
-    claudeAccessToken: config.claudeAccessToken,
-    claudeApiKey: config.claudeApiKey,
-    openaiApiKey: config.openaiApiKey,
-    geminiApiKey: config.geminiApiKey,
-    groqApiKey: config.groqApiKey,
-  }, httpClient);
+  const authConfig = buildAuthConfig(config, oauthToken);
+  const aiClient = new AIClient(authConfig, httpClient);
+
+  // Auto-update AIClient when token refreshes
+  if (tokenManager) {
+    tokenManager.onRefresh((newToken) => {
+      aiClient.updateAuth(buildAuthConfig(config, newToken));
+      console.log("AIClient updated with refreshed token");
+    });
+  }
 
   // Initialize vault tools & calendar
   const vaultTools = new ServerVaultTools(config.vaultPath);
@@ -59,6 +79,9 @@ import { Scheduler } from "./scheduler";
     openai: config.openaiApiKey,
     gemini: config.geminiApiKey,
   });
+  if (config.braveSearchApiKey) {
+    vaultTools.setBraveSearchApiKey(config.braveSearchApiKey);
+  }
 
   // Tool executor
   const toolExecutor = createToolExecutor(vaultTools, calendarManager);
@@ -85,7 +108,7 @@ import { Scheduler } from "./scheduler";
   });
 
   app.listen(config.port, () => {
-    console.log(`Life Companion Server running on port ${config.port}`);
+    console.log(`Life Companition AI Server running on port ${config.port}`);
     console.log(`Vault: ${config.vaultPath}`);
     console.log(`Model: ${config.defaultModel}`);
     console.log(`Telegram bot active, chat ID: ${config.telegramChatId}`);

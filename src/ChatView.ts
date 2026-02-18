@@ -93,7 +93,7 @@ export class ChatView extends ItemView {
   }
 
   getDisplayText(): string {
-    return this.conversation?.title || "Life Companion";
+    return this.conversation?.title || "Life Companition AI";
   }
 
   getIcon(): string {

@@ -74,19 +74,20 @@ export default class LifeCompanionPlugin extends Plugin {
       gemini: this.settings.geminiApiKey,
     });
     this.vaultTools.setSnapshotConfig(this.settings.snapshotsEnabled, this.settings.maxSnapshotsPerFile);
+    this.vaultTools.setBraveSearchApiKey(this.settings.braveSearchApiKey);
     this.calendarManager = new CalendarManager(this.app, () => this.settings.calendarEventsDirectory);
     this.profileManager = new ProfileManager(this.app);
     this.initAIClient();
 
     this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
 
-    this.addRibbonIcon("message-circle", "Life Companion", () => {
+    this.addRibbonIcon("message-circle", "Life Companition AI", () => {
       this.activateView();
     });
 
     this.addCommand({
       id: "open-chat",
-      name: "Open Life Companion",
+      name: "Open Life Companition AI",
       callback: () => this.activateView(),
     });
 
@@ -462,7 +463,7 @@ export default class LifeCompanionPlugin extends Plugin {
       view.stopStreaming();
       const msg = error instanceof Error ? error.message : "Unknown error";
       view.addAssistantMessage(t.error(msg));
-      new Notice(`Life Companion: ${msg}`);
+      new Notice(`Life Companition AI: ${msg}`);
     }
   }
 
@@ -648,6 +649,7 @@ export default class LifeCompanionPlugin extends Plugin {
       gemini: this.settings.geminiApiKey,
     });
     this.vaultTools.setSnapshotConfig(this.settings.snapshotsEnabled, this.settings.maxSnapshotsPerFile);
+    this.vaultTools.setBraveSearchApiKey(this.settings.braveSearchApiKey);
     // Refresh model dropdown in any open ChatView
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)) {
       (leaf.view as ChatView).refreshModels();

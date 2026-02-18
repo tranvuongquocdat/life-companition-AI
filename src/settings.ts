@@ -122,6 +122,40 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
           })
       );
 
+    // ─── Web Search ────────────────────────────────────────────
+    containerEl.createEl("h3", { text: "Web Search" });
+
+    const braveKey = this.plugin.settings.braveSearchApiKey;
+    if (braveKey) {
+      new Setting(containerEl)
+        .setName("Brave Search API")
+        .setDesc("Connected — 2,000 free queries/month. Falls back to DuckDuckGo when quota exceeded.")
+        .addButton((btn) =>
+          btn.setButtonText("Remove").onClick(async () => {
+            this.plugin.settings.braveSearchApiKey = "";
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+    } else {
+      let keyValue = "";
+      new Setting(containerEl)
+        .setName("Brave Search API Key")
+        .setDesc("Optional — get free key at brave.com/search/api (2,000 queries/month). Without it, DuckDuckGo is used.")
+        .addText((text) =>
+          text.setPlaceholder("BSA...").onChange((v) => { keyValue = v; })
+        )
+        .addButton((btn) =>
+          btn.setButtonText("Save").onClick(async () => {
+            if (!keyValue.trim()) return;
+            this.plugin.settings.braveSearchApiKey = keyValue.trim();
+            await this.plugin.saveSettings();
+            new Notice("Brave Search API key saved");
+            this.display();
+          })
+        );
+    }
+
     // ─── Snapshots ─────────────────────────────────────────────
     containerEl.createEl("h3", { text: "Snapshots" });
 
