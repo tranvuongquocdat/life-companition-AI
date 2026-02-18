@@ -160,6 +160,16 @@ npm run dev    # Watch mode — auto-rebuilds on changes
 
 Reload Obsidian (Cmd+R / Ctrl+R) to pick up changes.
 
+## Network Usage
+
+This plugin sends your messages and vault content to external AI providers for processing. No data is sent without your explicit action (typing a message, using a tool). The following services may be contacted depending on your configuration:
+
+- **AI providers**: Anthropic (Claude), OpenAI, Google (Gemini), Groq — for chat responses and text summarization
+- **Web search**: Brave Search API or DuckDuckGo — only when the AI uses the web search tool in Deep Dive mode
+- **Web fetch**: Fetches URLs only when the AI uses the web fetch tool
+
+All API keys are stored locally in your Obsidian settings. No telemetry or analytics are collected.
+
 ## License
 
-MIT
+[MIT](LICENSE)

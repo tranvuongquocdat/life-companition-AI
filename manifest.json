@@ -1,9 +1,9 @@
 {
   "id": "life-companion",
   "name": "Life Companition AI",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "minAppVersion": "1.0.0",
-  "description": "AI-powered life companition — brainstorm, organize notes, and reflect on your life with AI.",
+  "description": "Chat with an AI that reads, searches, and organizes your vault — brainstorm ideas, manage calendars, and reflect on your life.",
   "author": "Dat",
   "isDesktopOnly": true
 }
