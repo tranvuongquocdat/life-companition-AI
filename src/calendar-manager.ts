@@ -12,6 +12,7 @@ export interface CalendarEvent {
   startTime?: string;
   endTime?: string;
   completed?: boolean;
+  completedDates?: string[];
   daysOfWeek?: (string | number)[];
   startRecur?: string;
   endRecur?: string;
@@ -116,6 +117,7 @@ export class CalendarManager {
       startTime: fm.startTime,
       endTime: fm.endTime,
       completed: fm.completed,
+      completedDates: fm.completedDates,
       daysOfWeek: fm.daysOfWeek,
       startRecur: fm.startRecur,
       endRecur: fm.endRecur,
@@ -222,14 +224,28 @@ export class CalendarManager {
     return true; // unsupported FREQ — show rather than hide
   }
 
+  /** Resolve completed status for a specific date occurrence */
+  private isCompletedOn(event: CalendarEvent, dateStr: string): boolean {
+    if (event.type === "single") return !!event.completed;
+    return event.completedDates?.includes(dateStr) ?? false;
+  }
+
+  /** Create a per-date copy of event with resolved completed state */
+  private resolveForDate(event: CalendarEvent, dateStr: string): CalendarEvent {
+    if (event.type === "single") return event;
+    return { ...event, completed: this.isCompletedOn(event, dateStr) };
+  }
+
   // ─── Tool: get_events ───────────────────────────────────
 
   async getEvents(date?: string, startDate?: string, endDate?: string): Promise<string> {
     const events = await this.getAllEvents();
     let filtered: CalendarEvent[];
 
+    const queryDate = date || new Date().toISOString().split("T")[0];
+
     if (date) {
-      filtered = events.filter((e) => this.eventOccursOnDate(e, date));
+      filtered = events.filter((e) => this.eventOccursOnDate(e, date)).map((e) => this.resolveForDate(e, date));
     } else if (startDate && endDate) {
       filtered = [];
       const cur = new Date(startDate + "T00:00:00");
@@ -240,14 +256,13 @@ export class CalendarManager {
         for (const e of events) {
           if (this.eventOccursOnDate(e, ds) && !seen.has(e.filePath)) {
             seen.add(e.filePath);
-            filtered.push(e);
+            filtered.push(this.resolveForDate(e, ds));
           }
         }
         cur.setDate(cur.getDate() + 1);
       }
     } else {
-      const today = new Date().toISOString().split("T")[0];
-      filtered = events.filter((e) => this.eventOccursOnDate(e, today));
+      filtered = events.filter((e) => this.eventOccursOnDate(e, queryDate)).map((e) => this.resolveForDate(e, queryDate));
     }
 
     if (filtered.length === 0) return "No events found for the specified date/range.";
@@ -274,7 +289,7 @@ export class CalendarManager {
         if (this.eventOccursOnDate(event, ds)) {
           if (!grouped[ds]) grouped[ds] = [];
           if (!grouped[ds].some((e) => e.filePath === event.filePath)) {
-            grouped[ds].push(event);
+            grouped[ds].push(this.resolveForDate(event, ds));
           }
         }
       }
@@ -379,6 +394,38 @@ export class CalendarManager {
     return `Updated event: ${path}`;
   }
 
+  // ─── Tool: complete_event ───────────────────────────────
+
+  async completeEvent(path: string, completed: boolean, date?: string): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!file || !(file instanceof TFile)) return `Event file not found: ${path}`;
+
+    await this.app.fileManager.processFrontMatter(file, (fm) => {
+      const type = fm.type || "single";
+
+      if (type === "single") {
+        if (completed) {
+          fm.completed = true;
+        } else {
+          delete fm.completed;
+        }
+      } else {
+        // Recurring/rrule: track per-date completion
+        const dates: string[] = fm.completedDates || [];
+        if (completed && date && !dates.includes(date)) {
+          dates.push(date);
+          fm.completedDates = dates;
+        } else if (!completed && date) {
+          fm.completedDates = dates.filter((d: string) => d !== date);
+          if (fm.completedDates.length === 0) delete fm.completedDates;
+        }
+      }
+    });
+
+    await this.waitForFileCache(path);
+    return completed ? `Marked completed: ${path}` : `Marked incomplete: ${path}`;
+  }
+
   // ─── Tool: delete_event ─────────────────────────────────
 
   async deleteEvent(path: string): Promise<string> {
@@ -399,7 +446,7 @@ export class CalendarManager {
       const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const dayEvents: CalendarEvent[] = [];
       for (const event of events) {
-        if (this.eventOccursOnDate(event, ds)) dayEvents.push(event);
+        if (this.eventOccursOnDate(event, ds)) dayEvents.push(this.resolveForDate(event, ds));
       }
       if (dayEvents.length > 0) map.set(ds, dayEvents);
     }

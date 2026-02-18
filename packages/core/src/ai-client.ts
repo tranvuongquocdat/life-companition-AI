@@ -1,18 +1,34 @@
-import { requestUrl } from "obsidian";
 import type { AIModel, AIProvider, AIResponse, Attachment, ChatMode, SimpleMessage, TokenUsage } from "./types";
-import type { VaultTools } from "./vault-tools";
-import type { CalendarManager } from "./calendar-manager";
 import type { ToolDefinition } from "./tool-definitions";
 
-interface SendMessageOptions {
+// ─── HTTP abstraction (platform-agnostic) ──────────────────────
+
+export interface HttpRequestOptions {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+  throw?: boolean;
+}
+
+export interface HttpResponse {
+  status: number;
+  text: string;
+  json: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+export type HttpClient = (req: HttpRequestOptions) => Promise<HttpResponse>;
+
+// ─── Send options ──────────────────────────────────────────────
+
+export interface SendMessageOptions {
   userMessage: string;
   mode: ChatMode;
   model: AIModel;
   provider: AIProvider;
   systemPrompt: string;
   conversationHistory: SimpleMessage[];
-  vaultTools: VaultTools;
-  calendarManager?: CalendarManager;
+  toolExecutor: (name: string, input: Record<string, unknown>) => Promise<string>;
   tools?: ToolDefinition[];
   attachments?: Attachment[];
   onText: (text: string) => void;
@@ -21,7 +37,7 @@ interface SendMessageOptions {
   onToolResult: (toolName: string, result: string) => void;
 }
 
-interface AuthConfig {
+export interface AuthConfig {
   claudeAccessToken?: string;
   claudeApiKey?: string;
   openaiApiKey?: string;
@@ -31,9 +47,11 @@ interface AuthConfig {
 
 export class AIClient {
   private auth: AuthConfig;
+  private http: HttpClient;
 
-  constructor(auth: AuthConfig) {
+  constructor(auth: AuthConfig, httpClient: HttpClient) {
     this.auth = auth;
+    this.http = httpClient;
   }
 
   updateAuth(auth: AuthConfig) {
@@ -77,7 +95,7 @@ export class AIClient {
   async summarize(text: string, systemPrompt: string, provider: AIProvider, model: string): Promise<AIResponse> {
     switch (provider) {
       case "claude": {
-        const res = await requestUrl({
+        const res = await this.http({
           url: "https://api.anthropic.com/v1/messages",
           method: "POST",
           headers: this.getClaudeHeaders(),
@@ -97,7 +115,7 @@ export class AIClient {
           ? "https://api.openai.com/v1/chat/completions"
           : "https://api.groq.com/openai/v1/chat/completions";
         const key = provider === "openai" ? (this.auth.openaiApiKey || "") : (this.auth.groqApiKey || "");
-        const res = await requestUrl({
+        const res = await this.http({
           url, method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({ model, max_tokens: 2048, messages: [
@@ -114,7 +132,7 @@ export class AIClient {
         };
       }
       case "gemini": {
-        const res = await requestUrl({
+        const res = await this.http({
           url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.auth.geminiApiKey || ""}`,
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -155,7 +173,7 @@ export class AIClient {
   }
 
   private async sendClaude(options: SendMessageOptions): Promise<AIResponse> {
-    const { model, systemPrompt, conversationHistory, vaultTools, onText, onToolUse, onToolResult } = options;
+    const { model, systemPrompt, conversationHistory, onText, onToolUse, onToolResult } = options;
     const isDive = options.mode === "dive";
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -201,7 +219,7 @@ export class AIClient {
           : { type: "enabled", budget_tokens: 10000 };
       }
 
-      const response = await requestUrl({
+      const response = await this.http({
         url: "https://api.anthropic.com/v1/messages",
         method: "POST",
         headers: this.getClaudeHeaders(options.mode),
@@ -251,7 +269,7 @@ export class AIClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const toolResults: any[] = [];
       for (const toolUse of toolUseBlocks) {
-        const result = await this.executeTool(toolUse.name, toolUse.input, vaultTools, options.calendarManager);
+        const result = await options.toolExecutor(toolUse.name, toolUse.input as Record<string, unknown>);
         onToolResult(toolUse.name, result);
         toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: result });
       }
@@ -268,7 +286,7 @@ export class AIClient {
     apiUrl: string,
     apiKey: string
   ): Promise<AIResponse> {
-    const { model, systemPrompt, conversationHistory, vaultTools, onText, onToolUse, onToolResult } = options;
+    const { model, systemPrompt, conversationHistory, onText, onToolUse, onToolResult } = options;
 
     const userContent = this.formatOpenAIUserContent(options.userMessage, options.attachments || []);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -301,7 +319,7 @@ export class AIClient {
       }
       if (toolDefs.length > 0) body.tools = toolDefs;
 
-      const response = await requestUrl({
+      const response = await this.http({
         url: apiUrl,
         method: "POST",
         headers: {
@@ -339,7 +357,7 @@ export class AIClient {
         const fn = toolCall.function;
         const args = JSON.parse(fn.arguments);
         onToolUse(fn.name, args);
-        const result = await this.executeTool(fn.name, args, vaultTools, options.calendarManager);
+        const result = await options.toolExecutor(fn.name, args);
         onToolResult(fn.name, result);
         messages.push({ role: "tool", tool_call_id: toolCall.id, content: result });
       }
@@ -351,7 +369,7 @@ export class AIClient {
   // ─── Gemini (Google) ──────────────────────────────────────────────
 
   private async sendGemini(options: SendMessageOptions): Promise<AIResponse> {
-    const { model, systemPrompt, conversationHistory, vaultTools, onText, onToolUse, onToolResult } = options;
+    const { model, systemPrompt, conversationHistory, onText, onToolUse, onToolResult } = options;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const contents: any[] = conversationHistory.map((m) => ({
@@ -383,7 +401,7 @@ export class AIClient {
         }];
       }
 
-      const response = await requestUrl({
+      const response = await this.http({
         url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -428,7 +446,7 @@ export class AIClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const functionResponses: any[] = [];
       for (const fc of functionCalls) {
-        const result = await this.executeTool(fc.name, fc.args || {}, vaultTools, options.calendarManager);
+        const result = await options.toolExecutor(fc.name, fc.args || {});
         onToolResult(fc.name, result);
         functionResponses.push({
           functionResponse: { name: fc.name, response: { result } },
@@ -492,107 +510,5 @@ export class AIClient {
     }
     parts.push({ text });
     return parts;
-  }
-
-  // ─── Tool execution ───────────────────────────────────────────────
-
-  private async executeTool(
-    name: string,
-    input: Record<string, unknown>,
-    vaultTools: VaultTools,
-    calendarManager?: CalendarManager
-  ): Promise<string> {
-    try {
-      switch (name) {
-        case "search_vault":
-          return await vaultTools.searchVault(input.query as string);
-        case "read_note":
-          return await vaultTools.readNote(input.path as string);
-        case "write_note":
-          return await vaultTools.writeNote(input.path as string, input.content as string);
-        case "move_note":
-          return await vaultTools.moveNote(input.from as string, input.to as string);
-        case "list_folder":
-          return await vaultTools.listFolder(input.path as string);
-        case "get_recent_notes":
-          return await vaultTools.getRecentNotes(input.days as number);
-        case "web_search":
-          return await vaultTools.webSearch(input.query as string);
-        case "web_fetch":
-          return await vaultTools.webFetch(input.url as string);
-        case "append_note":
-          return await vaultTools.appendNote(input.path as string, input.content as string);
-        case "read_properties":
-          return await vaultTools.readProperties(input.path as string);
-        case "update_properties":
-          return await vaultTools.updateProperties(input.path as string, input.properties as Record<string, unknown>);
-        case "get_tags":
-          return await vaultTools.getTags();
-        case "search_by_tag":
-          return await vaultTools.searchByTag(input.tag as string);
-        case "get_vault_stats":
-          return await vaultTools.getVaultStats();
-        case "get_backlinks":
-          return await vaultTools.getBacklinks(input.path as string);
-        case "get_outgoing_links":
-          return await vaultTools.getOutgoingLinks(input.path as string);
-        case "get_tasks":
-          return await vaultTools.getTasks(input.path as string, (input.includeCompleted as boolean) ?? true);
-        case "toggle_task":
-          return await vaultTools.toggleTask(input.path as string, input.line as number);
-        case "get_daily_note":
-          return await vaultTools.getDailyNote(input.date as string);
-        case "create_daily_note":
-          return await vaultTools.createDailyNote(input.date as string, input.content as string);
-        // Calendar tools
-        case "check_calendar_status":
-          if (!calendarManager) return "Calendar manager not available.";
-          return await calendarManager.checkCalendarStatus();
-        case "get_events":
-          if (!calendarManager) return "Calendar manager not available.";
-          return await calendarManager.getEvents(input.date as string, input.startDate as string, input.endDate as string);
-        case "create_event":
-          if (!calendarManager) return "Calendar manager not available.";
-          return await calendarManager.createEvent({
-            title: input.title as string, date: input.date as string,
-            startTime: input.startTime as string, endTime: input.endTime as string,
-            allDay: input.allDay as boolean, endDate: input.endDate as string,
-            type: input.type as "single" | "recurring" | "rrule",
-            daysOfWeek: input.daysOfWeek as string[], startRecur: input.startRecur as string,
-            endRecur: input.endRecur as string, rrule: input.rrule as string,
-            body: input.body as string,
-          });
-        case "update_event":
-          if (!calendarManager) return "Calendar manager not available.";
-          return await calendarManager.updateEvent(input.path as string, input.properties as Record<string, unknown>);
-        case "delete_event":
-          if (!calendarManager) return "Calendar manager not available.";
-          return await calendarManager.deleteEvent(input.path as string);
-        case "get_upcoming_events":
-          if (!calendarManager) return "Calendar manager not available.";
-          return await calendarManager.getUpcomingEvents((input.days as number) || 7);
-        // Memory & Goals tools
-        case "save_memory":
-          return await vaultTools.saveMemory(input.content as string, input.type as string);
-        case "recall_memory":
-          return await vaultTools.recallMemory(input.query as string, input.days as number, input.limit as number);
-        case "gather_retro_data":
-          return await vaultTools.gatherRetroData(input.startDate as string, input.endDate as string);
-        case "save_retro":
-          return await vaultTools.saveRetro(input.period as string, input.content as string);
-        case "get_goals":
-          return await vaultTools.getGoals();
-        case "update_goal":
-          return await vaultTools.updateGoal(input.title as string, {
-            status: input.status as string,
-            progress: input.progress as string,
-            target: input.target as string,
-          });
-        default:
-          return `Unknown tool: ${name}`;
-      }
-    } catch (error) {
-      return `Error executing ${name}: ${(error as Error).message}`;
-    }
   }
 }

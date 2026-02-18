@@ -104,6 +104,37 @@ export const VAULT_TOOLS: ToolDefinition[] = [
       required: ["days"],
     },
   },
+  {
+    name: "get_snapshots",
+    description:
+      "List available snapshots (previous versions) for a note. Snapshots are automatically created when write_note overwrites an existing file. Use this to help the user recover or compare old content.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "The note path to list snapshots for (e.g. 'areas/career/goals.md')",
+        },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "read_snapshot",
+    description:
+      "Read the content of a specific snapshot (previous version of a note). Use get_snapshots first to find available snapshot paths.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description:
+            "The full snapshot path returned by get_snapshots (e.g. 'system/snapshots/areas--career--goals.md/2026-02-14T10-30-45.md')",
+        },
+      },
+      required: ["path"],
+    },
+  },
 ];
 
 export const KNOWLEDGE_TOOLS: ToolDefinition[] = [
@@ -346,6 +377,20 @@ export const CALENDAR_TOOLS: ToolDefinition[] = [
         path: { type: "string", description: "File path of the event to delete" },
       },
       required: ["path"],
+    },
+  },
+  {
+    name: "complete_event",
+    description:
+      "Toggle the completed status of a calendar event. For recurring events, provide the specific date to mark that occurrence only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path of the event" },
+        completed: { type: "boolean", description: "true to mark as completed, false to re-open" },
+        date: { type: "string", description: "YYYY-MM-DD date of the specific occurrence (required for recurring events)" },
+      },
+      required: ["path", "completed"],
     },
   },
   {

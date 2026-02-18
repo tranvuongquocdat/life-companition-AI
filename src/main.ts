@@ -1,29 +1,32 @@
-import { Notice, Plugin } from "obsidian";
+import { Notice, Plugin, requestUrl } from "obsidian";
 import { ChatView, VIEW_TYPE_CHAT } from "./ChatView";
 import { ChatHistory } from "./chat-history";
-import { AIClient } from "./ai-client";
 import { ProfileManager } from "./profile";
-import { buildSystemPrompt } from "./prompts";
 import { LifeCompanionSettingTab } from "./settings";
 import { refreshFromClaudeCode } from "./auth";
+import { VaultTools } from "./vault-tools";
+import { CalendarManager } from "./calendar-manager";
 import {
+  AIClient,
+  buildSystemPrompt,
+  SUMMARIZE_PROMPT,
   DEFAULT_SETTINGS,
   MODEL_CONTEXT_LIMITS,
   SUMMARIZE_MODEL_PREFERENCE,
   getEffectiveModelGroups,
   getProvider,
+  getI18n,
+  VAULT_TOOLS, WEB_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, MEMORY_TOOLS,
   type AIProvider,
   type Attachment,
   type ChatMode,
   type ConversationState,
+  type HttpRequestOptions,
   type LifeCompanionSettings,
   type SavedConversation,
   type SimpleMessage,
-} from "./types";
-import { VaultTools } from "./vault-tools";
-import { CalendarManager } from "./calendar-manager";
-import { VAULT_TOOLS, WEB_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, MEMORY_TOOLS, type ToolDefinition } from "./tool-definitions";
-import { getI18n } from "./i18n";
+  type ToolDefinition,
+} from "@life-companion/core";
 
 /** Tools that create/modify vault content — used for hallucination detection */
 const WRITE_TOOLS = new Set([
@@ -70,6 +73,7 @@ export default class LifeCompanionPlugin extends Plugin {
       openai: this.settings.openaiApiKey,
       gemini: this.settings.geminiApiKey,
     });
+    this.vaultTools.setSnapshotConfig(this.settings.snapshotsEnabled, this.settings.maxSnapshotsPerFile);
     this.calendarManager = new CalendarManager(this.app, () => this.settings.calendarEventsDirectory);
     this.profileManager = new ProfileManager(this.app);
     this.initAIClient();
@@ -103,13 +107,27 @@ export default class LifeCompanionPlugin extends Plugin {
   }
 
   private initAIClient() {
-    this.aiClient = new AIClient({
-      claudeAccessToken: this.settings.accessToken,
-      claudeApiKey: this.settings.claudeApiKey,
-      openaiApiKey: this.settings.openaiApiKey,
-      geminiApiKey: this.settings.geminiApiKey,
-      groqApiKey: this.settings.groqApiKey,
-    });
+    const httpAdapter = async (req: HttpRequestOptions) => {
+      const res = await requestUrl({
+        url: req.url,
+        method: req.method,
+        headers: req.headers,
+        body: req.body,
+        throw: req.throw ?? false,
+      });
+      return { status: res.status, text: res.text, json: res.json };
+    };
+
+    this.aiClient = new AIClient(
+      {
+        claudeAccessToken: this.settings.accessToken,
+        claudeApiKey: this.settings.claudeApiKey,
+        openaiApiKey: this.settings.openaiApiKey,
+        geminiApiKey: this.settings.geminiApiKey,
+        groqApiKey: this.settings.groqApiKey,
+      },
+      httpAdapter,
+    );
   }
 
   private async ensureValidClaudeToken(): Promise<boolean> {
@@ -274,8 +292,7 @@ export default class LifeCompanionPlugin extends Plugin {
         provider,
         systemPrompt,
         conversationHistory: conversation.history,
-        vaultTools: this.vaultTools,
-        calendarManager: this.calendarManager,
+        toolExecutor: (name, input) => this.executeTool(name, input),
         tools,
         attachments: attachments || [],
         onText: (chunk) => {
@@ -338,8 +355,7 @@ export default class LifeCompanionPlugin extends Plugin {
           provider,
           systemPrompt,
           conversationHistory: retryHistory,
-          vaultTools: this.vaultTools,
-          calendarManager: this.calendarManager,
+          toolExecutor: (name, input) => this.executeTool(name, input),
           tools,
           attachments: [],
           onText: (chunk) => {
@@ -484,7 +500,6 @@ export default class LifeCompanionPlugin extends Plugin {
     }
 
     try {
-      const { SUMMARIZE_PROMPT } = await import("./prompts");
       const conversationText = toSummarize
         .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
         .join("\n\n");
@@ -521,6 +536,101 @@ export default class LifeCompanionPlugin extends Plugin {
     return null;
   }
 
+  private async executeTool(name: string, input: Record<string, unknown>): Promise<string> {
+    try {
+      switch (name) {
+        case "search_vault":
+          return await this.vaultTools.searchVault(input.query as string);
+        case "read_note":
+          return await this.vaultTools.readNote(input.path as string);
+        case "write_note":
+          return await this.vaultTools.writeNote(input.path as string, input.content as string);
+        case "move_note":
+          return await this.vaultTools.moveNote(input.from as string, input.to as string);
+        case "list_folder":
+          return await this.vaultTools.listFolder(input.path as string);
+        case "get_recent_notes":
+          return await this.vaultTools.getRecentNotes(input.days as number);
+        case "get_snapshots":
+          return await this.vaultTools.getSnapshots(input.path as string);
+        case "read_snapshot":
+          return await this.vaultTools.readSnapshot(input.path as string);
+        case "web_search":
+          return await this.vaultTools.webSearch(input.query as string);
+        case "web_fetch":
+          return await this.vaultTools.webFetch(input.url as string);
+        case "append_note":
+          return await this.vaultTools.appendNote(input.path as string, input.content as string);
+        case "read_properties":
+          return await this.vaultTools.readProperties(input.path as string);
+        case "update_properties":
+          return await this.vaultTools.updateProperties(input.path as string, input.properties as Record<string, unknown>);
+        case "get_tags":
+          return await this.vaultTools.getTags();
+        case "search_by_tag":
+          return await this.vaultTools.searchByTag(input.tag as string);
+        case "get_vault_stats":
+          return await this.vaultTools.getVaultStats();
+        case "get_backlinks":
+          return await this.vaultTools.getBacklinks(input.path as string);
+        case "get_outgoing_links":
+          return await this.vaultTools.getOutgoingLinks(input.path as string);
+        case "get_tasks":
+          return await this.vaultTools.getTasks(input.path as string, (input.includeCompleted as boolean) ?? true);
+        case "toggle_task":
+          return await this.vaultTools.toggleTask(input.path as string, input.line as number);
+        case "get_daily_note":
+          return await this.vaultTools.getDailyNote(input.date as string);
+        case "create_daily_note":
+          return await this.vaultTools.createDailyNote(input.date as string, input.content as string);
+        // Calendar tools
+        case "check_calendar_status":
+          return await this.calendarManager.checkCalendarStatus();
+        case "get_events":
+          return await this.calendarManager.getEvents(input.date as string, input.startDate as string, input.endDate as string);
+        case "create_event":
+          return await this.calendarManager.createEvent({
+            title: input.title as string, date: input.date as string,
+            startTime: input.startTime as string, endTime: input.endTime as string,
+            allDay: input.allDay as boolean, endDate: input.endDate as string,
+            type: input.type as "single" | "recurring" | "rrule",
+            daysOfWeek: input.daysOfWeek as string[], startRecur: input.startRecur as string,
+            endRecur: input.endRecur as string, rrule: input.rrule as string,
+            body: input.body as string,
+          });
+        case "update_event":
+          return await this.calendarManager.updateEvent(input.path as string, input.properties as Record<string, unknown>);
+        case "delete_event":
+          return await this.calendarManager.deleteEvent(input.path as string);
+        case "complete_event":
+          return await this.calendarManager.completeEvent(input.path as string, input.completed as boolean, input.date as string | undefined);
+        case "get_upcoming_events":
+          return await this.calendarManager.getUpcomingEvents((input.days as number) || 7);
+        // Memory & Goals tools
+        case "save_memory":
+          return await this.vaultTools.saveMemory(input.content as string, input.type as string);
+        case "recall_memory":
+          return await this.vaultTools.recallMemory(input.query as string, input.days as number, input.limit as number);
+        case "gather_retro_data":
+          return await this.vaultTools.gatherRetroData(input.startDate as string, input.endDate as string);
+        case "save_retro":
+          return await this.vaultTools.saveRetro(input.period as string, input.content as string);
+        case "get_goals":
+          return await this.vaultTools.getGoals();
+        case "update_goal":
+          return await this.vaultTools.updateGoal(input.title as string, {
+            status: input.status as string,
+            progress: input.progress as string,
+            target: input.target as string,
+          });
+        default:
+          return `Unknown tool: ${name}`;
+      }
+    } catch (error) {
+      return `Error executing ${name}: ${(error as Error).message}`;
+    }
+  }
+
   async loadSettings() {
     const loaded = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
@@ -537,6 +647,7 @@ export default class LifeCompanionPlugin extends Plugin {
       openai: this.settings.openaiApiKey,
       gemini: this.settings.geminiApiKey,
     });
+    this.vaultTools.setSnapshotConfig(this.settings.snapshotsEnabled, this.settings.maxSnapshotsPerFile);
     // Refresh model dropdown in any open ChatView
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)) {
       (leaf.view as ChatView).refreshModels();

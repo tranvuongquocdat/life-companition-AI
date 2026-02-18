@@ -44,6 +44,9 @@ export interface LifeCompanionSettings {
   // Calendar
   calendarEventsDirectory: string;
   calendarStartDay: 0 | 1 | 6; // 0=Sunday, 1=Monday, 6=Saturday
+  // Snapshots
+  snapshotsEnabled: boolean;
+  maxSnapshotsPerFile: number;
   // Tabs
   openTabs: string[];
   activeTabId: string | null;
@@ -62,7 +65,8 @@ export const DEFAULT_SETTINGS: LifeCompanionSettings = {
   enabledModels: ["claude-sonnet-4-5", "gpt-4.1", "gemini-3-flash-preview", "gemini-2.5-flash"],
   enabledTools: [
     "search_vault", "read_note", "write_note", "move_note",
-    "list_folder", "get_recent_notes", "web_search", "web_fetch",
+    "list_folder", "get_recent_notes", "get_snapshots", "read_snapshot",
+    "web_search", "web_fetch",
     "append_note", "read_properties", "update_properties",
     "get_tags", "search_by_tag", "get_vault_stats",
     "get_backlinks", "get_outgoing_links",
@@ -79,6 +83,8 @@ export const DEFAULT_SETTINGS: LifeCompanionSettings = {
   customModels: {},
   calendarEventsDirectory: "calendar",
   calendarStartDay: 1, // Monday
+  snapshotsEnabled: true,
+  maxSnapshotsPerFile: 3,
   openTabs: [],
   activeTabId: null,
 };
@@ -189,6 +195,8 @@ export const ALL_TOOLS: ToolInfo[] = [
   { name: "move_note", displayName: "Move Note", description: "Move or rename notes", category: "vault" },
   { name: "list_folder", displayName: "List Folder", description: "Browse vault folder structure", category: "vault" },
   { name: "get_recent_notes", displayName: "Recent Notes", description: "Get recently modified notes", category: "vault" },
+  { name: "get_snapshots", displayName: "Get Snapshots", description: "List previous versions of a note", category: "vault" },
+  { name: "read_snapshot", displayName: "Read Snapshot", description: "Read a previous version of a note", category: "vault" },
   { name: "web_search", displayName: "Web Search", description: "Search the web via DuckDuckGo", category: "web" },
   { name: "web_fetch", displayName: "Web Fetch", description: "Fetch and read a web page", category: "web" },
   // Knowledge

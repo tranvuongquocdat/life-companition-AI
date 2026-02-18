@@ -1,9 +1,12 @@
 import { App, Notice, PluginSettingTab, Setting, requestUrl } from "obsidian";
 import type LifeCompanionPlugin from "./main";
-import { ALL_TOOLS, MODEL_GROUPS, getEffectiveModelGroups, type AIModel, type AIProvider } from "./types";
-import { VAULT_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, WEB_TOOLS, MEMORY_TOOLS } from "./tool-definitions";
+import {
+  ALL_TOOLS, MODEL_GROUPS, getEffectiveModelGroups,
+  VAULT_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS, TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, WEB_TOOLS, MEMORY_TOOLS,
+  getI18n,
+  type AIModel, type AIProvider, type I18n, type Language,
+} from "@life-companion/core";
 import { readClaudeCodeCredentials } from "./auth";
-import { getI18n, type I18n, type Language } from "./i18n";
 
 export class LifeCompanionSettingTab extends PluginSettingTab {
   plugin: LifeCompanionPlugin;
@@ -118,6 +121,38 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // ─── Snapshots ─────────────────────────────────────────────
+    containerEl.createEl("h3", { text: "Snapshots" });
+
+    new Setting(containerEl)
+      .setName("Enable note snapshots")
+      .setDesc("Automatically save previous versions when a note is overwritten. Uses extra vault storage.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.snapshotsEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.snapshotsEnabled = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    if (this.plugin.settings.snapshotsEnabled) {
+      new Setting(containerEl)
+        .setName("Max snapshots per note")
+        .setDesc("Maximum number of previous versions to keep per note (older ones are deleted automatically)")
+        .addSlider((slider) =>
+          slider
+            .setLimits(1, 10, 1)
+            .setValue(this.plugin.settings.maxSnapshotsPerFile)
+            .setDynamicTooltip()
+            .onChange(async (value) => {
+              this.plugin.settings.maxSnapshotsPerFile = value;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
   }
 
   // ─── Collapsible Provider Section ───────────────────────────────

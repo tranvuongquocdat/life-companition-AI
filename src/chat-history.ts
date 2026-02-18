@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import type { ChatMessage } from "./types";
+import type { ChatMessage } from "@life-companion/core";
 
 export class ChatHistory {
   constructor(private app: App) {}

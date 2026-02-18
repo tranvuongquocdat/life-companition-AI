@@ -7,15 +7,16 @@ import {
   SUPPORTED_MIME_TYPES,
   getEffectiveModelGroups,
   resolveAttachmentType,
+  getI18n,
   type AIModel,
   type Attachment,
   type AttachmentRef,
   type ChatMessage,
   type ChatMode,
   type ConversationState,
+  type I18n,
   type SavedConversation,
-} from "./types";
-import { getI18n, type I18n } from "./i18n";
+} from "@life-companion/core";
 import type { CalendarEvent } from "./calendar-manager";
 
 export const VIEW_TYPE_CHAT = "life-companion-chat";
@@ -521,7 +522,8 @@ export class ChatView extends ItemView {
         const dots = cell.createDiv({ cls: "lc-cal-dots" });
         const showCount = Math.min(dayEvents.length, 3);
         for (let i = 0; i < showCount; i++) {
-          dots.createSpan({ cls: "lc-cal-dot" });
+          const dotCls = dayEvents[i].completed ? "lc-cal-dot lc-cal-dot-done" : "lc-cal-dot";
+          dots.createSpan({ cls: dotCls });
         }
         if (dayEvents.length > 3) {
           dots.createSpan({ cls: "lc-cal-dot-more", text: `+${dayEvents.length - 3}` });
@@ -574,8 +576,18 @@ export class ChatView extends ItemView {
 
           if (event.completed) item.addClass("lc-cal-event-completed");
 
-          // Action buttons (edit + delete)
+          // Action buttons (complete + edit + delete)
           const actions = item.createDiv({ cls: "lc-cal-event-actions" });
+
+          const completeBtn = actions.createEl("button", {
+            cls: `lc-cal-action-btn lc-cal-complete-btn${event.completed ? " lc-cal-completed" : ""}`,
+            attr: { "aria-label": event.completed ? "Mark incomplete" : "Mark complete" },
+          });
+          setIcon(completeBtn, event.completed ? "check-circle" : "circle");
+          completeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.toggleEventComplete(event.filePath, !event.completed, this.calendarSelectedDate!);
+          });
 
           const editBtn = actions.createEl("button", { cls: "lc-cal-action-btn", attr: { "aria-label": this.t.calendarEditEvent } });
           setIcon(editBtn, "pencil");
@@ -605,6 +617,17 @@ export class ChatView extends ItemView {
       const cm = this.plugin.calendarManager;
       await cm.deleteEvent(filePath);
       new Notice(this.t.calendarEventDeleted);
+      this.renderCalendar();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      new Notice(this.t.calendarSaveError(msg));
+    }
+  }
+
+  private async toggleEventComplete(filePath: string, completed: boolean, date: string) {
+    try {
+      const cm = this.plugin.calendarManager;
+      await cm.completeEvent(filePath, completed, date);
       this.renderCalendar();
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";

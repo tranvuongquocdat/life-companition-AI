@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  life-companion:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3456:3456"
+    volumes:
+      - ./data/vault:/data/vault
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Ho_Chi_Minh

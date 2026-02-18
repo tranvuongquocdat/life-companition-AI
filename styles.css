@@ -1205,6 +1205,10 @@ body.lc-resizing {
   background: var(--interactive-accent);
 }
 
+.lc-cal-dot-done {
+  background: var(--text-faint);
+}
+
 .lc-cal-dot-more {
   font-size: 8px;
   color: var(--text-faint);
@@ -1312,6 +1316,18 @@ body.lc-resizing {
   opacity: 1;
 }
 
+.lc-cal-event-completed .lc-cal-event-actions {
+  opacity: 1;
+}
+
+.lc-cal-event-completed .lc-cal-event-actions .lc-cal-action-btn:not(.lc-cal-complete-btn) {
+  opacity: 0;
+}
+
+.lc-cal-event-completed:hover .lc-cal-event-actions .lc-cal-action-btn {
+  opacity: 1;
+}
+
 .lc-cal-action-btn {
   display: flex;
   align-items: center;
@@ -1335,6 +1351,16 @@ body.lc-resizing {
 .lc-cal-action-btn .svg-icon {
   width: 13px;
   height: 13px;
+}
+
+.lc-cal-complete-btn:hover {
+  background: rgba(76, 175, 80, 0.1);
+  color: var(--text-success, #4caf50);
+}
+
+.lc-cal-completed {
+  color: var(--text-success, #4caf50) !important;
+  opacity: 1 !important;
 }
 
 .lc-cal-delete-btn:hover {

@@ -4,3 +4,8 @@ main.js
 .DS_Store
 data.json
 .claude/
+
+# Server
+packages/server/dist/
+.env
+data/
