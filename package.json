@@ -1,16 +1,16 @@
 {
   "name": "life-companion",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "AI life companion Obsidian plugin",
   "main": "main.js",
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/core"],
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "build:server": "cd packages/server && node esbuild.config.mjs",
+    "build:server": "cd packages/server && npm install && node esbuild.config.mjs",
     "start:server": "node packages/server/dist/index.js",
-    "dev:server": "cd packages/server && node esbuild.config.mjs && node dist/index.js",
+    "dev:server": "cd packages/server && npm install && node esbuild.config.mjs && node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

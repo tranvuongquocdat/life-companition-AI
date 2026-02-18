@@ -1,7 +1,7 @@
 {
   "id": "life-companion",
   "name": "Life Companion",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "minAppVersion": "1.0.0",
   "description": "AI-powered life companion — brainstorm, organize notes, and reflect on your life with Claude.",
   "author": "Dat",

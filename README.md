@@ -34,21 +34,32 @@ Full English and Vietnamese support — including all tool activity descriptions
 
 ## Getting Started
 
-### Install
+### Install via BRAT (Recommended)
 
-1. Clone this repo and build:
-   ```bash
-   git clone https://github.com/tranvuongquocdat/life-companition-AI.git
-   cd life-companition-AI
-   npm install && npm run build
-   ```
+1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from Community Plugins
+2. In BRAT settings, click "Add Beta Plugin"
+3. Paste: `tranvuongquocdat/life-companition-AI`
+4. Enable "Life Companion" in Community Plugins
 
-2. Copy `main.js`, `manifest.json`, and `styles.css` into your vault:
-   ```
-   your-vault/.obsidian/plugins/life-companion/
-   ```
+BRAT will auto-update the plugin when new releases are published.
 
-3. In Obsidian, go to **Settings → Community Plugins** and enable **Life Companion**.
+### Install Manually
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/tranvuongquocdat/life-companition-AI/releases/latest)
+2. Create folder: `your-vault/.obsidian/plugins/life-companion/`
+3. Copy the 3 files into that folder
+4. In Obsidian: Settings → Community Plugins → Enable "Life Companion"
+
+### Build from Source (Developers)
+
+```bash
+git clone https://github.com/tranvuongquocdat/life-companition-AI.git
+cd life-companition-AI
+npm install && npm run build
+ln -s "$(pwd)" /path/to/your-vault/.obsidian/plugins/life-companion
+```
+
+See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full developer setup.
 
 ### Set Up an AI Provider
 
@@ -95,6 +106,24 @@ The AI can perform **20+ actions** on your vault, all toggleable in settings:
 - **Web** — Search the web and fetch pages (Deep Dive mode)
 
 The AI is designed to be honest about its actions — if it claims it saved or created something, it actually called the tool. If something goes wrong, you'll see a warning instead of a false confirmation.
+
+## Telegram Bot (Optional)
+
+Want to chat with your vault from your phone? The optional server package adds:
+
+- **Telegram bot** — Chat with your AI companion from anywhere
+- **Morning briefings** — Auto-summary of today's events, tasks, and goals
+- **Evening recaps** — Review what you accomplished today
+- **Smart reminders** — AI-planned notifications before events
+
+Setup:
+```bash
+cd packages/server && npm install
+cp .env.example .env  # Configure tokens
+npm run start:server
+```
+
+See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full server setup guide.
 
 ## Development
 
