@@ -1,6 +1,6 @@
 {
   "name": "@life-companion/server",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",
