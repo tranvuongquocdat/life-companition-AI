@@ -48,10 +48,12 @@ export interface AuthConfig {
 export class AIClient {
   private auth: AuthConfig;
   private http: HttpClient;
+  private onAuthRetry?: () => Promise<AuthConfig | null>;
 
-  constructor(auth: AuthConfig, httpClient: HttpClient) {
+  constructor(auth: AuthConfig, httpClient: HttpClient, onAuthRetry?: () => Promise<AuthConfig | null>) {
     this.auth = auth;
     this.http = httpClient;
+    this.onAuthRetry = onAuthRetry;
   }
 
   updateAuth(auth: AuthConfig) {
@@ -95,13 +97,26 @@ export class AIClient {
   async summarize(text: string, systemPrompt: string, provider: AIProvider, model: string): Promise<AIResponse> {
     switch (provider) {
       case "claude": {
-        const res = await this.http({
+        let res = await this.http({
           url: "https://api.anthropic.com/v1/messages",
           method: "POST",
           headers: this.getClaudeHeaders(),
           body: JSON.stringify({ model, max_tokens: 2048, system: systemPrompt, messages: [{ role: "user", content: text }] }),
           throw: false,
         });
+        if (res.status === 401 && this.onAuthRetry) {
+          const newAuth = await this.onAuthRetry();
+          if (newAuth) {
+            this.auth = newAuth;
+            res = await this.http({
+              url: "https://api.anthropic.com/v1/messages",
+              method: "POST",
+              headers: this.getClaudeHeaders(),
+              body: JSON.stringify({ model, max_tokens: 2048, system: systemPrompt, messages: [{ role: "user", content: text }] }),
+              throw: false,
+            });
+          }
+        }
         if (res.status !== 200) throw new Error(`Summarize failed: ${res.status}`);
         const d = res.json;
         return {
@@ -201,6 +216,7 @@ export class AIClient {
 
     let fullResponse = "";
     const totalUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+    let authRetried = false;
 
     while (true) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -226,6 +242,16 @@ export class AIClient {
         body: JSON.stringify(body),
         throw: false,
       });
+
+      // Auto-retry on 401: refresh OAuth token and try once more
+      if (response.status === 401 && !authRetried && this.onAuthRetry) {
+        const newAuth = await this.onAuthRetry();
+        if (newAuth) {
+          this.auth = newAuth;
+          authRetried = true;
+          continue;
+        }
+      }
 
       if (response.status !== 200) {
         throw new Error(`${response.status} ${response.text}`);

@@ -1,7 +1,7 @@
 {
   "id": "life-companion",
   "name": "Life Companion AI",
-  "version": "0.5.9",
+  "version": "0.6.0",
   "minAppVersion": "1.0.0",
   "description": "Chat with an AI that reads, searches, and organizes your vault — brainstorm ideas, manage calendars, and reflect on your life.",
   "author": "Tran Vuong Quoc Dat",

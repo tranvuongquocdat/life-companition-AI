@@ -128,6 +128,28 @@ export default class LifeCompanionPlugin extends Plugin {
         groqApiKey: this.settings.groqApiKey,
       },
       httpAdapter,
+      // Auto-retry on 401: re-read fresh token from Claude Code Keychain
+      async () => {
+        if (!this.settings.accessToken) return null;
+        try {
+          const tokens = refreshFromClaudeCode();
+          // Only use if the new token is actually fresh (not expired)
+          if (Date.now() > tokens.expiresAt - 60_000) return null;
+          this.settings.accessToken = tokens.accessToken;
+          this.settings.refreshToken = tokens.refreshToken;
+          this.settings.tokenExpiresAt = tokens.expiresAt;
+          await this.saveData(this.settings);
+          return {
+            claudeAccessToken: tokens.accessToken,
+            claudeApiKey: this.settings.claudeApiKey,
+            openaiApiKey: this.settings.openaiApiKey,
+            geminiApiKey: this.settings.geminiApiKey,
+            groqApiKey: this.settings.groqApiKey,
+          };
+        } catch {
+          return null;
+        }
+      },
     );
   }
 
@@ -461,7 +483,17 @@ export default class LifeCompanionPlugin extends Plugin {
     } catch (error) {
       view.stopThinking();
       view.stopStreaming();
-      const msg = error instanceof Error ? error.message : "Unknown error";
+      let msg = error instanceof Error ? error.message : "Unknown error";
+      // Friendly message for OAuth token expiry
+      if (msg.includes("401") && msg.includes("authentication_error")) {
+        msg = this.settings.language === "vi"
+          ? "OAuth token đã hết hạn. Mở Terminal chạy `claude` để refresh token, sau đó thử lại."
+          : "OAuth token expired. Open Terminal and run `claude` to refresh your session, then try again.";
+        // Clear expired token so user can re-authenticate
+        this.settings.accessToken = "";
+        this.settings.refreshToken = "";
+        this.saveData(this.settings);
+      }
       view.addAssistantMessage(t.error(msg));
       new Notice(`Life Companion AI: ${msg}`);
     }

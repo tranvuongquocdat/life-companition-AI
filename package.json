@@ -1,6 +1,6 @@
 {
   "name": "life-companion",
-  "version": "0.5.9",
+  "version": "0.6.0",
   "description": "AI life companition Obsidian plugin",
   "main": "main.js",
   "type": "module",
