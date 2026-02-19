@@ -1,36 +1,128 @@
-# Life Companion AI — Your AI Assistant Inside Obsidian
+<a id="readme-top"></a>
 
-Turn your Obsidian vault into a personal life management system. Life Companion AI is an AI-powered plugin that lives right inside your notes — it can read, search, organize your vault, manage your calendar, and have meaningful conversations that actually understand your life context.
+<div align="center">
 
-## What Can It Do?
+<!-- TODO: Replace with your plugin logo/icon (128x128 recommended) -->
+<img src="resources/icon.png" alt="Life Companion AI Logo" width="128"/>
 
-**Chat naturally with your notes**
-Ask questions about your vault, brainstorm ideas, or just have a conversation. The AI reads your notes, understands your structure, and responds with context — not generic answers.
+</div>
 
-**Manage your calendar**
-Built-in calendar view with full event management. Create one-time or recurring events (daily, weekly, monthly, or custom intervals like "every 3 days"). Works seamlessly with the Full Calendar plugin.
+<h1 align="center">Life Companion AI</h1>
 
-**Two conversation modes**
+<div align="center">
+
+<p>
+  <a href="https://github.com/tranvuongquocdat/life-companion-AI/releases/latest">
+    <img src="https://img.shields.io/github/v/release/tranvuongquocdat/life-companion-AI?style=flat&label=Version&labelColor=444" alt="Latest version">
+  </a>
+  <a href="https://github.com/tranvuongquocdat/life-companion-AI/releases">
+    <img src="https://img.shields.io/github/downloads/tranvuongquocdat/life-companion-AI/total?label=Downloads&labelColor=444" alt="Total downloads">
+  </a>
+  <a href="https://github.com/tranvuongquocdat/life-companion-AI/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/tranvuongquocdat/life-companion-AI?label=License&labelColor=444" alt="License">
+  </a>
+  <a href="https://obsidian.md">
+    <img src="https://img.shields.io/badge/Obsidian-1.0.0+-7C3AED?labelColor=444&logo=obsidian&logoColor=white" alt="Obsidian">
+  </a>
+</p>
+
+Your AI assistant inside Obsidian — chat, organize, and manage your life.
+
+</div>
+
+<!-- TODO: Add hero screenshot of the chat UI here -->
+<!-- Screenshot guide: Open the plugin, start a conversation, and take a full-width screenshot -->
+![Life Companion AI](resources/hero.png)
+
+## Table of Contents
+
+<ol>
+  <li><a href="#about-the-project">About The Project</a></li>
+  <li><a href="#features">Features</a></li>
+  <li><a href="#getting-started">Getting Started</a></li>
+  <li><a href="#ai-providers">AI Providers</a></li>
+  <li><a href="#telegram-bot">Telegram Bot (Optional)</a></li>
+  <li><a href="#development">Development</a></li>
+  <li><a href="#network-usage">Network Usage</a></li>
+  <li><a href="#contributing">Contributing</a></li>
+  <li><a href="#license">License</a></li>
+</ol>
+
+## About The Project
+
+**Life Companion AI** turns your Obsidian vault into a personal life management system. It lives right inside your notes — reading, searching, and organizing your vault through natural conversation. Not generic AI answers, but responses that actually understand your life context.
+
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
+
+## Features
+
+### AI Chat
+
+Ask questions about your vault, brainstorm ideas, or just have a conversation. The AI reads your notes, understands your structure, and responds with full context.
+
+<!-- TODO: Screenshot of a chat conversation showing vault-aware responses -->
+<!-- Guide: Ask the AI something about your notes and capture the response -->
+![AI Chat](resources/feature-chat.png)
+
+### Calendar Management
+
+Built-in calendar view with full event management. Create one-time or recurring events (daily, weekly, monthly, or custom intervals). Works seamlessly with the Full Calendar plugin.
+
+<!-- TODO: Screenshot of the calendar view with some events -->
+<!-- Guide: Open the calendar view and capture it with a few events visible -->
+![Calendar](resources/feature-calendar.png)
+
+### Quick & Deep Dive Modes
+
+Two conversation modes for different needs:
 - **Quick** — Fast, lightweight replies for quick questions and note capture
-- **Deep Dive** — Extended thinking mode with web search, deep analysis, and multi-step reasoning. When using Claude, the AI shows its thinking process in real-time.
+- **Deep Dive** — Extended thinking with web search, deep analysis, and multi-step reasoning
 
-**Smart context management**
-The AI tracks how much context it's using and automatically summarizes older messages when the conversation gets long — so you never hit a wall mid-conversation. Token usage is displayed in real-time with actual counts from the API.
+<!-- TODO: Screenshot showing the mode selector or a Deep Dive response with thinking process -->
+<!-- Guide: Switch to Deep Dive mode and capture a response that shows the thinking process -->
+![Conversation Modes](resources/feature-modes.png)
 
-**Organize your vault**
-Search notes, create new ones, move files around, manage tags and properties, extract tasks — all through natural conversation. The AI shows a live activity feed of what it's doing (searching, reading, writing) so you always know what's happening.
+### Vault Organization
 
-**Multiple AI providers**
-Use whichever AI you prefer: Claude, OpenAI (ChatGPT), Gemini, or Groq. Switch models anytime from the toolbar.
+Search notes, create new ones, move files around, manage tags and properties, extract tasks — all through natural conversation. A live activity feed shows exactly what the AI is doing.
 
-**Chrome-style tabs**
+<!-- TODO: Screenshot of the AI performing vault actions with the activity feed visible -->
+<!-- Guide: Ask the AI to search or organize something and capture the activity feed -->
+![Vault Organization](resources/feature-vault-tools.png)
+
+### Multi-Provider Support
+
+Use whichever AI you prefer: **Claude**, **OpenAI**, **Gemini**, or **Groq**. Switch models anytime from the toolbar.
+
+<!-- TODO: Screenshot of the model selector dropdown in the toolbar -->
+<!-- Guide: Click the model selector to show the dropdown with all providers -->
+![Multi-Provider](resources/feature-providers.png)
+
+### Chrome-Style Tabs
+
 Run multiple conversations in parallel. Each tab remembers its own history.
 
-**File attachments**
+<!-- TODO: Screenshot showing multiple open conversation tabs -->
+<!-- Guide: Open 2-3 tabs with different conversations and capture the tab bar -->
+![Tabs](resources/feature-tabs.png)
+
+### File Attachments
+
 Drop in images, PDFs, or text files — the AI can read and discuss them.
 
-**Bilingual**
+<!-- TODO: Screenshot of a conversation with an attached file -->
+<!-- Guide: Attach a PDF or image and capture the AI's response about it -->
+![Attachments](resources/feature-attachments.png)
+
+### Bilingual Support
+
 Full English and Vietnamese support — including all tool activity descriptions.
+
+<!-- TODO: Screenshot of the UI in Vietnamese -->
+<!-- Guide: Switch language to Vietnamese and capture any screen -->
+![Bilingual](resources/feature-bilingual.png)
+
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
 
 ## Getting Started
 
@@ -50,18 +142,13 @@ BRAT will auto-update the plugin when new releases are published.
 3. Copy the 3 files into that folder
 4. In Obsidian: Settings → Community Plugins → Enable "Life Companion AI"
 
-### Build from Source (Developers)
+### Start Chatting
 
-```bash
-git clone https://github.com/tranvuongquocdat/life-companion-AI.git
-cd life-companion-AI
-npm install && npm run build
-ln -s "$(pwd)" /path/to/your-vault/.obsidian/plugins/life-companion
-```
+Click the Life Companion AI icon in the sidebar (or use the command palette). That's it — start typing and the AI will respond with full awareness of your vault.
 
-See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full developer setup.
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
 
-### Set Up an AI Provider
+## AI Providers
 
 Go to **Settings → Life Companion AI** and add at least one API key:
 
@@ -74,47 +161,28 @@ Go to **Settings → Life Companion AI** and add at least one API key:
 
 > **macOS users with Claude Code**: You can log in without an API key using the Claude Code OAuth option in settings.
 
-### Start Chatting
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
 
-Click the Life Companion AI icon in the sidebar (or use the command palette). That's it — start typing and the AI will respond with full awareness of your vault.
+## Telegram Bot
 
-## How the AI Works With Your Vault
+<details>
+<summary><strong>Chat with your vault from your phone (Optional)</strong></summary>
 
-On first run, the plugin creates a few helper folders:
+<br>
 
-```
-system/
-├── profile.md     ← The AI learns about you over time and saves context here
-├── index.md       ← A guide to your vault structure
-├── retro/         ← Space for reflections and retrospectives
-└── chats/         ← Your conversation history (auto-saved daily)
-inbox/             ← Quick capture inbox
-```
-
-The AI uses your profile and vault index to give personalized responses. Over time, it builds up context about your preferences, projects, and how you organize things.
-
-## Available AI Tools
-
-The AI can perform **20+ actions** on your vault, all toggleable in settings:
-
-- **Notes** — Search, read, create, edit, move, list folders, recent notes
-- **Knowledge** — Append content, manage frontmatter properties, tags, vault stats
-- **Connections** — View backlinks and outgoing links
-- **Tasks** — Find tasks across notes, toggle checkboxes
-- **Daily Notes** — Read or create today's daily note
-- **Calendar** — Create, update, delete events with full recurring support
-- **Web** — Search the web and fetch pages (Deep Dive mode)
-
-The AI is designed to be honest about its actions — if it claims it saved or created something, it actually called the tool. If something goes wrong, you'll see a warning instead of a false confirmation.
-
-## Telegram Bot + Server (Optional)
-
-Want to chat with your vault from your phone? Run the server on a home PC (or any machine) to get:
+Run the server on a home PC (or any machine) to get:
 
 - **Telegram bot** — Chat with your AI companion from anywhere
 - **Morning briefings** — Auto-summary of today's events, tasks, and goals
 - **Evening recaps** — Review what you accomplished today
 - **Smart reminders** — AI-planned notifications before events
+
+### Create a Telegram Bot
+
+1. Open Telegram, find **@BotFather**
+2. Send `/newbot`, choose a name and username
+3. Copy the bot token (looks like `7123456789:AAF-abc123...`)
+4. Send any message to your new bot, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` to find your Chat ID
 
 ### Quick Setup (2 steps)
 
@@ -132,16 +200,7 @@ Go to **Settings → Life Companion → Vault Sync**, paste the Device ID, click
 
 That's it — chat with your bot on Telegram.
 
-### Create a Telegram Bot (before Step 1)
-
-1. Open Telegram, find **@BotFather**
-2. Send `/newbot`, choose a name and username
-3. Copy the bot token (looks like `7123456789:AAF-abc123...`)
-4. Send any message to your new bot, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` to find your Chat ID
-
 ### Manual Setup
-
-If you prefer manual control over the automated script:
 
 ```bash
 git clone https://github.com/tranvuongquocdat/life-companion-AI.git
@@ -152,13 +211,39 @@ docker compose up -d
 
 See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full details.
 
+</details>
+
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
+
 ## Development
 
+<details>
+<summary><strong>Build from source & contribute</strong></summary>
+
+<br>
+
+### Build from Source
+
 ```bash
-npm run dev    # Watch mode — auto-rebuilds on changes
+git clone https://github.com/tranvuongquocdat/life-companion-AI.git
+cd life-companion-AI
+npm install && npm run build
+ln -s "$(pwd)" /path/to/your-vault/.obsidian/plugins/life-companion
+```
+
+### Watch Mode
+
+```bash
+npm run dev    # Auto-rebuilds on changes
 ```
 
 Reload Obsidian (Cmd+R / Ctrl+R) to pick up changes.
+
+See [docs/DEV-SETUP.md](docs/DEV-SETUP.md) for full developer setup.
+
+</details>
+
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
 
 ## Network Usage
 
@@ -170,6 +255,18 @@ This plugin sends your messages and vault content to external AI providers for p
 
 All API keys are stored locally in your Obsidian settings. No telemetry or analytics are collected.
 
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
+
+## Contributing
+
+- ⭐ [Star on GitHub: Help others discover Life Companion AI](https://github.com/tranvuongquocdat/life-companion-AI)
+
+- 🐛 [Report Issues: Help us improve the plugin](https://github.com/tranvuongquocdat/life-companion-AI/issues)
+
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
+
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+<p align="right"><a href="#readme-top">Back to top ⬆️</a></p>
