@@ -294,7 +294,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
       // Not configured — show connect form
       new Setting(statusEl)
         .setName("Syncthing")
-        .setDesc("Running — enter the Server Device ID to connect.");
+        .setDesc("Running — enter the server device ID to connect.");
 
       let deviceIdValue = "";
       new Setting(statusEl)
@@ -308,7 +308,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
         .addButton((btn) =>
           btn.setButtonText("Connect").setCta().onClick(() => { void (async () => {
             const id = deviceIdValue.trim();
-            if (!id) { new Notice("Enter the Server Device ID first"); return; }
+            if (!id) { new Notice("Enter the server device ID first"); return; }
 
             btn.setButtonText("Connecting...");
             btn.setDisabled(true);
@@ -316,7 +316,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
             // Add device
             const added = await syncthing.addDevice(id, "Life Companion Server");
             if (!added) {
-              new Notice("Failed to add device. Check the Device ID and try again.");
+              new Notice("Failed to add device. Check the device ID and try again.");
               btn.setButtonText("Connect");
               btn.setDisabled(false);
               return;
@@ -482,7 +482,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
 
     if (currentKey) {
       new Setting(body)
-        .setName(t.connectedVia("API Key"))
+        .setName(t.connectedVia("API key"))
         .addButton((btn) =>
           btn.setButtonText(t.removeKey).onClick(() => { void (async () => {
             this.plugin.settings[keyField as keyof LifeCompanionSettings] = "" as never;
@@ -544,7 +544,7 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
         );
     } else if (this.plugin.settings.claudeApiKey) {
       new Setting(body)
-        .setName(t.connectedVia("API Key"))
+        .setName(t.connectedVia("API key"))
         .addButton((btn) =>
           btn.setButtonText(t.removeKey).onClick(() => { void (async () => {
             this.plugin.settings.claudeApiKey = "";
@@ -722,7 +722,8 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
           });
           return response.status === 200;
       }
-    } catch {
+    } catch (e) {
+      console.debug("API key verification failed:", e);
       return false;
     }
   }
@@ -783,7 +784,8 @@ export class LifeCompanionSettingTab extends PluginSettingTab {
             .sort((a: FetchedModel, b: FetchedModel) => a.id.localeCompare(b.id));
         }
       }
-    } catch {
+    } catch (e) {
+      console.debug("Model fetch failed:", e);
       return [];
     }
   }

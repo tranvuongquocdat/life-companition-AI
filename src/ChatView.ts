@@ -77,7 +77,7 @@ export class ChatView extends ItemView {
     const now = Date.now();
     this.conversation = {
       id: now.toString(36),
-      title: "New Chat", // will be overwritten by first user message
+      title: "New chat", // will be overwritten by first user message
       messages: [],
       history: [],
       mode: "quick",
@@ -787,7 +787,7 @@ export class ChatView extends ItemView {
     if (existing?.daysOfWeek) {
       for (const d of existing.daysOfWeek) {
         if (typeof d === "number") selectedDays.add(d);
-        else if (DOW_LETTER_TO_NUM[d as string] !== undefined) selectedDays.add(DOW_LETTER_TO_NUM[d as string]);
+        else if (DOW_LETTER_TO_NUM[String(d)] !== undefined) selectedDays.add(DOW_LETTER_TO_NUM[String(d)]);
       }
     }
     // Also parse BYDAY from rrule for custom weekly
@@ -1164,9 +1164,9 @@ export class ChatView extends ItemView {
       case "toggle_task":
         return t.toolTogglingTask;
       case "get_daily_note":
-        return t.toolDailyRead(input.date as string | undefined);
+        return t.toolDailyRead(input.date ? String(input.date) : undefined);
       case "create_daily_note":
-        return t.toolDailyCreate(input.date as string | undefined);
+        return t.toolDailyCreate(input.date ? String(input.date) : undefined);
       case "check_calendar_status":
         return t.toolCalendarCheck;
       case "get_events": {
@@ -1184,7 +1184,7 @@ export class ChatView extends ItemView {
       case "save_memory":
         return t.toolSavingMemory;
       case "recall_memory":
-        return t.toolRecalling(input.query as string | undefined);
+        return t.toolRecalling(input.query ? String(input.query) : undefined);
       case "gather_retro_data":
         return t.toolGatheringRetro(String(input.startDate || ""), String(input.endDate || ""));
       case "save_retro":
@@ -1647,7 +1647,7 @@ export class ChatView extends ItemView {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        const result = reader.result as string;
+        const result = String(reader.result ?? "");
         resolve(result.split(",")[1]); // strip data:...;base64, prefix
       };
       reader.onerror = reject;

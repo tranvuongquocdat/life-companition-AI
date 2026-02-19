@@ -15,7 +15,8 @@ import { TokenManager, buildAuthConfig } from "./auth";
   // Validate vault path exists
   try {
     await access(config.vaultPath);
-  } catch {
+  } catch (e) {
+    console.debug("Vault path access check failed", e);
     console.error(`ERROR: Vault path does not exist: ${config.vaultPath}`);
     console.error("Create the directory or set VAULT_PATH correctly in .env");
     process.exit(1);
@@ -30,7 +31,7 @@ import { TokenManager, buildAuthConfig } from "./auth";
     });
     const text = await res.text();
     let json: unknown;
-    try { json = JSON.parse(text); } catch { json = null; }
+    try { json = JSON.parse(text); } catch (e) { console.debug("httpClient: JSON parse failed", e); json = null; }
     return { status: res.status, text, json };
   };
 
@@ -46,7 +47,7 @@ import { TokenManager, buildAuthConfig } from "./auth";
     const token = await tokenManager.load();
     if (token) {
       oauthToken = token;
-      console.log("OAuth auto-refresh enabled");
+      console.debug("OAuth auto-refresh enabled");
     }
   }
 
@@ -66,7 +67,7 @@ import { TokenManager, buildAuthConfig } from "./auth";
   if (tokenManager) {
     tokenManager.onRefresh((newToken) => {
       aiClient.updateAuth(buildAuthConfig(config, newToken));
-      console.log("AIClient updated with refreshed token");
+      console.debug("AIClient updated with refreshed token");
     });
   }
 
@@ -108,9 +109,9 @@ import { TokenManager, buildAuthConfig } from "./auth";
   });
 
   app.listen(config.port, () => {
-    console.log(`Life Companion AI Server running on port ${config.port}`);
-    console.log(`Vault: ${config.vaultPath}`);
-    console.log(`Model: ${config.defaultModel}`);
-    console.log(`Telegram bot active, chat ID: ${config.telegramChatId}`);
+    console.debug(`Life Companion AI Server running on port ${config.port}`);
+    console.debug(`Vault: ${config.vaultPath}`);
+    console.debug(`Model: ${config.defaultModel}`);
+    console.debug(`Telegram bot active, chat ID: ${config.telegramChatId}`);
   });
 })();

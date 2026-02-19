@@ -23,7 +23,6 @@ import {
   type ConversationState,
   type HttpRequestOptions,
   type LifeCompanionSettings,
-  type SavedConversation,
   type SimpleMessage,
   type ToolDefinition,
 } from "@life-companion/core";
@@ -583,88 +582,93 @@ export default class LifeCompanionPlugin extends Plugin {
     try {
       switch (name) {
         case "search_vault":
-          return await this.vaultTools.searchVault(input.query as string);
+          return await this.vaultTools.searchVault(String(input.query ?? ""));
         case "read_note":
-          return await this.vaultTools.readNote(input.path as string);
+          return await this.vaultTools.readNote(String(input.path ?? ""));
         case "write_note":
-          return await this.vaultTools.writeNote(input.path as string, input.content as string);
+          return await this.vaultTools.writeNote(String(input.path ?? ""), String(input.content ?? ""));
         case "move_note":
-          return await this.vaultTools.moveNote(input.from as string, input.to as string);
+          return await this.vaultTools.moveNote(String(input.from ?? ""), String(input.to ?? ""));
         case "list_folder":
-          return await this.vaultTools.listFolder(input.path as string);
+          return this.vaultTools.listFolder(String(input.path ?? ""));
         case "get_recent_notes":
-          return await this.vaultTools.getRecentNotes(input.days as number);
+          return this.vaultTools.getRecentNotes(Number(input.days ?? 0));
         case "get_snapshots":
-          return await this.vaultTools.getSnapshots(input.path as string);
+          return this.vaultTools.getSnapshots(String(input.path ?? ""));
         case "read_snapshot":
-          return await this.vaultTools.readSnapshot(input.path as string);
+          return await this.vaultTools.readSnapshot(String(input.path ?? ""));
         case "web_search":
-          return await this.vaultTools.webSearch(input.query as string);
+          return await this.vaultTools.webSearch(String(input.query ?? ""));
         case "web_fetch":
-          return await this.vaultTools.webFetch(input.url as string);
+          return await this.vaultTools.webFetch(String(input.url ?? ""));
         case "append_note":
-          return await this.vaultTools.appendNote(input.path as string, input.content as string);
+          return await this.vaultTools.appendNote(String(input.path ?? ""), String(input.content ?? ""));
         case "read_properties":
-          return await this.vaultTools.readProperties(input.path as string);
+          return this.vaultTools.readProperties(String(input.path ?? ""));
         case "update_properties":
-          return await this.vaultTools.updateProperties(input.path as string, input.properties as Record<string, unknown>);
+          return await this.vaultTools.updateProperties(String(input.path ?? ""), input.properties as Record<string, unknown>);
         case "get_tags":
-          return await this.vaultTools.getTags();
+          return this.vaultTools.getTags();
         case "search_by_tag":
-          return await this.vaultTools.searchByTag(input.tag as string);
+          return this.vaultTools.searchByTag(String(input.tag ?? ""));
         case "get_vault_stats":
-          return await this.vaultTools.getVaultStats();
+          return this.vaultTools.getVaultStats();
         case "get_backlinks":
-          return await this.vaultTools.getBacklinks(input.path as string);
+          return this.vaultTools.getBacklinks(String(input.path ?? ""));
         case "get_outgoing_links":
-          return await this.vaultTools.getOutgoingLinks(input.path as string);
+          return this.vaultTools.getOutgoingLinks(String(input.path ?? ""));
         case "get_tasks":
-          return await this.vaultTools.getTasks(input.path as string, (input.includeCompleted as boolean) ?? true);
+          return await this.vaultTools.getTasks(String(input.path ?? ""), input.includeCompleted !== false);
         case "toggle_task":
-          return await this.vaultTools.toggleTask(input.path as string, input.line as number);
+          return await this.vaultTools.toggleTask(String(input.path ?? ""), Number(input.line ?? 0));
         case "get_daily_note":
-          return await this.vaultTools.getDailyNote(input.date as string);
+          return await this.vaultTools.getDailyNote(String(input.date ?? ""));
         case "create_daily_note":
-          return await this.vaultTools.createDailyNote(input.date as string, input.content as string);
+          return await this.vaultTools.createDailyNote(String(input.date ?? ""), String(input.content ?? ""));
         // Calendar tools
         case "check_calendar_status":
           return await this.calendarManager.checkCalendarStatus();
         case "get_events":
-          return await this.calendarManager.getEvents(input.date as string, input.startDate as string, input.endDate as string);
+          return await this.calendarManager.getEvents(String(input.date ?? ""), String(input.startDate ?? ""), String(input.endDate ?? ""));
         case "create_event":
           return await this.calendarManager.createEvent({
-            title: input.title as string, date: input.date as string,
-            startTime: input.startTime as string, endTime: input.endTime as string,
-            allDay: input.allDay as boolean, endDate: input.endDate as string,
-            type: input.type as "single" | "recurring" | "rrule",
-            daysOfWeek: input.daysOfWeek as string[], startRecur: input.startRecur as string,
-            endRecur: input.endRecur as string, rrule: input.rrule as string,
-            body: input.body as string,
+            title: String(input.title ?? ""),
+            date: String(input.date ?? ""),
+            startTime: String(input.startTime ?? ""),
+            endTime: String(input.endTime ?? ""),
+            allDay: input.allDay === true,
+            endDate: String(input.endDate ?? ""),
+            type: (String(input.type ?? "single")) as "single" | "recurring" | "rrule",
+            daysOfWeek: Array.isArray(input.daysOfWeek) ? input.daysOfWeek.map(String) : [],
+            startRecur: String(input.startRecur ?? ""),
+            endRecur: String(input.endRecur ?? ""),
+            rrule: String(input.rrule ?? ""),
+            body: String(input.body ?? ""),
           });
         case "update_event":
-          return await this.calendarManager.updateEvent(input.path as string, input.properties as Record<string, unknown>);
+          return await this.calendarManager.updateEvent(String(input.path ?? ""), (input.properties ?? {}) as Record<string, unknown>);
         case "delete_event":
-          return await this.calendarManager.deleteEvent(input.path as string);
+          return await this.calendarManager.deleteEvent(String(input.path ?? ""));
         case "complete_event":
-          return await this.calendarManager.completeEvent(input.path as string, input.completed as boolean, input.date as string | undefined);
+          return await this.calendarManager.completeEvent(String(input.path ?? ""), input.completed === true, input.date ? String(input.date) : undefined);
         case "get_upcoming_events":
-          return await this.calendarManager.getUpcomingEvents((input.days as number) || 7);
+          return await this.calendarManager.getUpcomingEvents(Number(input.days ?? 0) || 7);
         // Memory & Goals tools
         case "save_memory":
-          return await this.vaultTools.saveMemory(input.content as string, input.type as string);
+          return await this.vaultTools.saveMemory(String(input.content ?? ""), String(input.type ?? ""));
         case "recall_memory":
-          return await this.vaultTools.recallMemory(input.query as string, input.days as number, input.limit as number);
+          return await this.vaultTools.recallMemory(String(input.query ?? ""), Number(input.days ?? 0), Number(input.limit ?? 0));
         case "gather_retro_data":
-          return await this.vaultTools.gatherRetroData(input.startDate as string, input.endDate as string);
+          return await this.vaultTools.gatherRetroData(String(input.startDate ?? ""), String(input.endDate ?? ""));
         case "save_retro":
-          return await this.vaultTools.saveRetro(input.period as string, input.content as string);
+          return await this.vaultTools.saveRetro(String(input.period ?? ""), String(input.content ?? ""));
         case "get_goals":
           return await this.vaultTools.getGoals();
         case "update_goal":
-          return await this.vaultTools.updateGoal(input.title as string, {
-            status: input.status as string,
-            progress: input.progress as string,
-            target: input.target as string,
+          return await this.vaultTools.updateGoal(String(input.title ?? ""), {
+            status: String(input.status ?? ""),
+            progress: String(input.progress ?? ""),
+            target: String(input.target ?? ""),
           });
         default:
           return `Unknown tool: ${name}`;

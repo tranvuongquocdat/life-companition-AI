@@ -1,4 +1,4 @@
-import { App, TFile, TFolder } from "obsidian";
+import { App, TFile } from "obsidian";
 
 // ─── Event types matching Full Calendar frontmatter schema ───
 
@@ -104,24 +104,28 @@ export class CalendarManager {
 
   // ─── Parse Events ───────────────────────────────────────
 
+  private fmStr(v: unknown): string | undefined { return typeof v === "string" ? v : undefined; }
+  private fmBool(v: unknown): boolean | undefined { return typeof v === "boolean" ? v : undefined; }
+  private fmStrArr(v: unknown): string[] | undefined { return Array.isArray(v) ? v.map(String) : undefined; }
+
   private parseEvent(file: TFile, fm: Record<string, unknown>): CalendarEvent {
     return {
       filePath: file.path,
-      title: (fm.title as string) || file.basename,
-      type: (fm.type as CalendarEvent["type"]) || "single",
-      date: fm.date as string | undefined,
-      endDate: fm.endDate as string | undefined,
-      allDay: fm.allDay as boolean | undefined,
-      startTime: fm.startTime as string | undefined,
-      endTime: fm.endTime as string | undefined,
-      completed: fm.completed as boolean | undefined,
-      completedDates: fm.completedDates as string[] | undefined,
-      daysOfWeek: fm.daysOfWeek as (string | number)[] | undefined,
-      startRecur: fm.startRecur as string | undefined,
-      endRecur: fm.endRecur as string | undefined,
-      rrule: fm.rrule as string | undefined,
-      startDate: fm.startDate as string | undefined,
-      skipDates: fm.skipDates as string[] | undefined,
+      title: this.fmStr(fm.title) || file.basename,
+      type: (this.fmStr(fm.type) || "single") as CalendarEvent["type"],
+      date: this.fmStr(fm.date),
+      endDate: this.fmStr(fm.endDate),
+      allDay: this.fmBool(fm.allDay),
+      startTime: this.fmStr(fm.startTime),
+      endTime: this.fmStr(fm.endTime),
+      completed: this.fmBool(fm.completed),
+      completedDates: this.fmStrArr(fm.completedDates),
+      daysOfWeek: Array.isArray(fm.daysOfWeek) ? fm.daysOfWeek as (string | number)[] : undefined,
+      startRecur: this.fmStr(fm.startRecur),
+      endRecur: this.fmStr(fm.endRecur),
+      rrule: this.fmStr(fm.rrule),
+      startDate: this.fmStr(fm.startDate),
+      skipDates: this.fmStrArr(fm.skipDates),
     };
   }
 
@@ -157,7 +161,7 @@ export class CalendarManager {
       const dow = date.getDay();
       return event.daysOfWeek.some((d) => {
         if (typeof d === "number") return d === dow;
-        return DOW_LETTER_MAP[d as string] === dow;
+        return DOW_LETTER_MAP[String(d)] === dow;
       });
     }
 

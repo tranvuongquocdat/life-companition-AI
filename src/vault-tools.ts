@@ -498,7 +498,7 @@ export class VaultTools {
   async appendNote(path: string, content: string): Promise<string> {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!file || !(file instanceof TFile)) return `File not found: ${path}. Use write_note to create it first, or search_vault to find the correct path.`;
-    await this.app.vault.append(file, "\n" + content);
+    await this.app.vault.append(file, content);
     return `Appended to: ${path}`;
   }
 
@@ -530,8 +530,8 @@ export class VaultTools {
     for (const file of this.app.vault.getMarkdownFiles()) {
       const cache = this.app.metadataCache.getFileCache(file);
       const tags = cache?.tags?.map((t) => t.tag) || [];
-      const fmTags = (cache?.frontmatter?.tags || []) as string[];
-      for (const tag of [...tags, ...fmTags.map((t) => t.startsWith("#") ? t : "#" + t)]) {
+      const fmTags = Array.isArray(cache?.frontmatter?.tags) ? cache.frontmatter.tags.map(String) : [];
+      for (const tag of [...tags, ...fmTags.map((t: string) => t.startsWith("#") ? t : "#" + t)]) {
         tagCounts[tag] = (tagCounts[tag] || 0) + 1;
       }
     }
@@ -548,8 +548,8 @@ export class VaultTools {
     for (const file of this.app.vault.getMarkdownFiles()) {
       const cache = this.app.metadataCache.getFileCache(file);
       const tags = cache?.tags?.map((t) => t.tag) || [];
-      const fmTags = ((cache?.frontmatter?.tags || []) as string[])
-        .map((t) => t.startsWith("#") ? t : "#" + t);
+      const fmTags = (Array.isArray(cache?.frontmatter?.tags) ? cache.frontmatter.tags.map(String) : [])
+        .map((t: string) => t.startsWith("#") ? t : "#" + t);
       if ([...tags, ...fmTags].includes(normalized)) {
         results.push(file.path);
       }

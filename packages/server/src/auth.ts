@@ -45,7 +45,7 @@ export class TokenManager {
       this.expiresAt = data.claudeAiOauth.expiresAt;
 
       const expiresIn = Math.max(0, this.expiresAt - Date.now());
-      console.log(`OAuth token loaded, expires in ${Math.floor(expiresIn / 60000)} minutes`);
+      console.debug(`OAuth token loaded, expires in ${Math.floor(expiresIn / 60000)} minutes`);
 
       this.scheduleRefresh();
       return this.accessToken;
@@ -81,7 +81,7 @@ export class TokenManager {
     }
 
     if (this.refreshToken && refreshIn > 0) {
-      console.log(`Token refresh scheduled in ${Math.floor(refreshIn / 60000)} minutes`);
+      console.debug(`Token refresh scheduled in ${Math.floor(refreshIn / 60000)} minutes`);
       this.refreshTimer = setTimeout(() => {
         this.refresh().catch((e) => console.error("Scheduled token refresh failed:", e));
       }, refreshIn);
@@ -95,7 +95,7 @@ export class TokenManager {
       return;
     }
 
-    console.log("Refreshing OAuth token...");
+    console.debug("Refreshing OAuth token...");
 
     try {
       const res = await fetch("https://console.anthropic.com/v1/oauth/token", {
@@ -125,7 +125,7 @@ export class TokenManager {
       // Save updated tokens back to credentials file
       await this.saveCredentials();
 
-      console.log(`Token refreshed, expires in ${Math.floor((this.expiresAt - Date.now()) / 60000)} minutes`);
+      console.debug(`Token refreshed, expires in ${Math.floor((this.expiresAt - Date.now()) / 60000)} minutes`);
 
       // Notify listener (AIClient)
       if (this.onTokenRefreshed) {
@@ -138,10 +138,10 @@ export class TokenManager {
       console.error("Token refresh error:", (error as Error).message);
 
       // Fallback: try re-reading credentials file (Claude Code might have refreshed it)
-      console.log("Trying to re-read credentials file...");
+      console.debug("Trying to re-read credentials file...");
       const token = await this.load();
       if (token && this.expiresAt > Date.now()) {
-        console.log("Got fresh token from credentials file");
+        console.debug("Got fresh token from credentials file");
         if (this.onTokenRefreshed) {
           this.onTokenRefreshed(this.accessToken);
         }

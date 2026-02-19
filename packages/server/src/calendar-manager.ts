@@ -1,3 +1,4 @@
+import { readFileSync } from "fs";
 import { readFile, writeFile, readdir, unlink, mkdir, access } from "fs/promises";
 import { join, basename } from "path";
 import matter from "gray-matter";
@@ -40,11 +41,12 @@ export class ServerCalendarManager {
   private detectEventsDir(): string | null {
     try {
       const configPath = join(this.vaultPath, ".obsidian/plugins/obsidian-full-calendar/data.json");
-      const content = require("fs").readFileSync(configPath, "utf-8");
+      const content = readFileSync(configPath, "utf-8");
       const data = JSON.parse(content);
-      const localSource = data.calendarSources?.find((s: any) => s.type === "local");
+      const localSource = data.calendarSources?.find((s: { type: string }) => s.type === "local");
       return localSource?.directory || null;
-    } catch {
+    } catch (e) {
+      console.debug("detectEventsDir: could not read Full Calendar config", e);
       return null;
     }
   }
@@ -61,7 +63,8 @@ export class ServerCalendarManager {
     try {
       await access(this.resolve(p));
       return true;
-    } catch {
+    } catch (e) {
+      console.debug("dirExists check failed", e);
       return false;
     }
   }
@@ -78,25 +81,29 @@ export class ServerCalendarManager {
 
   // ─── Parse Events ───────────────────────────────────────
 
+  private fmStr(v: unknown): string | undefined { return typeof v === "string" ? v : undefined; }
+  private fmBool(v: unknown): boolean | undefined { return typeof v === "boolean" ? v : undefined; }
+  private fmStrArr(v: unknown): string[] | undefined { return Array.isArray(v) ? v.map(String) : undefined; }
+
   private parseEvent(filePath: string, fm: Record<string, unknown>): CalendarEvent {
     const name = basename(filePath, ".md");
     return {
       filePath,
-      title: (fm.title as string) || name,
-      type: (fm.type as CalendarEvent["type"]) || "single",
-      date: fm.date as string | undefined,
-      endDate: fm.endDate as string | undefined,
-      allDay: fm.allDay as boolean | undefined,
-      startTime: fm.startTime as string | undefined,
-      endTime: fm.endTime as string | undefined,
-      completed: fm.completed as boolean | undefined,
-      completedDates: fm.completedDates as string[] | undefined,
-      daysOfWeek: fm.daysOfWeek as (string | number)[] | undefined,
-      startRecur: fm.startRecur as string | undefined,
-      endRecur: fm.endRecur as string | undefined,
-      rrule: fm.rrule as string | undefined,
-      startDate: fm.startDate as string | undefined,
-      skipDates: fm.skipDates as string[] | undefined,
+      title: this.fmStr(fm.title) || name,
+      type: (this.fmStr(fm.type) || "single") as CalendarEvent["type"],
+      date: this.fmStr(fm.date),
+      endDate: this.fmStr(fm.endDate),
+      allDay: this.fmBool(fm.allDay),
+      startTime: this.fmStr(fm.startTime),
+      endTime: this.fmStr(fm.endTime),
+      completed: this.fmBool(fm.completed),
+      completedDates: this.fmStrArr(fm.completedDates),
+      daysOfWeek: Array.isArray(fm.daysOfWeek) ? fm.daysOfWeek as (string | number)[] : undefined,
+      startRecur: this.fmStr(fm.startRecur),
+      endRecur: this.fmStr(fm.endRecur),
+      rrule: this.fmStr(fm.rrule),
+      startDate: this.fmStr(fm.startDate),
+      skipDates: this.fmStrArr(fm.skipDates),
     };
   }
 
@@ -114,9 +121,9 @@ export class ServerCalendarManager {
           if (data.title) {
             events.push(this.parseEvent(filePath, data));
           }
-        } catch { /* skip unparseable files */ }
+        } catch (e) { console.debug("getAllEvents: skip unparseable file", e); }
       }
-    } catch { /* directory doesn't exist */ }
+    } catch (e) { console.debug("getAllEvents: directory doesn't exist", e); }
     return events;
   }
 
@@ -138,7 +145,7 @@ export class ServerCalendarManager {
       const dow = date.getDay();
       return event.daysOfWeek.some((d) => {
         if (typeof d === "number") return d === dow;
-        return DOW_LETTER_MAP[d as string] === dow;
+        return DOW_LETTER_MAP[String(d)] === dow;
       });
     }
 
@@ -303,7 +310,7 @@ export class ServerCalendarManager {
     try {
       await access(fullPath);
       return `Event file already exists: ${filePath}. Use update_event instead.`;
-    } catch { /* file doesn't exist — good */ }
+    } catch (e) { console.debug("createEvent: file doesn't exist, proceeding", e); }
 
     // Build frontmatter
     const fm: Record<string, unknown> = {
@@ -311,7 +318,7 @@ export class ServerCalendarManager {
       type: params.type || "single",
     };
 
-    const eventType = fm.type as string;
+    const eventType = String(fm.type ?? "single");
 
     if (eventType === "single") {
       fm.date = params.date;
@@ -349,7 +356,8 @@ export class ServerCalendarManager {
     let content: string;
     try {
       content = await readFile(fullPath, "utf8");
-    } catch {
+    } catch (e) {
+      console.debug("updateEvent: file not found", e);
       return `Event file not found: ${path}`;
     }
 
@@ -374,12 +382,13 @@ export class ServerCalendarManager {
     let content: string;
     try {
       content = await readFile(fullPath, "utf8");
-    } catch {
+    } catch (e) {
+      console.debug("completeEvent: file not found", e);
       return `Event file not found: ${path}`;
     }
 
     const parsed = matter(content);
-    const type = (parsed.data.type as string) || "single";
+    const type = String(parsed.data.type ?? "single");
 
     if (type === "single") {
       if (completed) {
@@ -388,13 +397,13 @@ export class ServerCalendarManager {
         delete parsed.data.completed;
       }
     } else {
-      const dates: string[] = (parsed.data.completedDates as string[]) || [];
+      const dates: string[] = Array.isArray(parsed.data.completedDates) ? parsed.data.completedDates.map(String) : [];
       if (completed && date && !dates.includes(date)) {
         dates.push(date);
         parsed.data.completedDates = dates;
       } else if (!completed && date) {
         parsed.data.completedDates = dates.filter((d: string) => d !== date);
-        if ((parsed.data.completedDates as string[]).length === 0) delete parsed.data.completedDates;
+        if (Array.isArray(parsed.data.completedDates) && parsed.data.completedDates.length === 0) delete parsed.data.completedDates;
       }
     }
 
@@ -409,7 +418,8 @@ export class ServerCalendarManager {
     try {
       await unlink(this.resolve(path));
       return `Deleted event: ${path}`;
-    } catch {
+    } catch (e) {
+      console.debug("deleteEvent: file not found", e);
       return `Event file not found: ${path}`;
     }
   }

@@ -1,5 +1,5 @@
 import { readFile, writeFile, readdir, stat, mkdir, rename, unlink, access } from "fs/promises";
-import { join, relative, dirname, extname } from "path";
+import { join, relative, dirname } from "path";
 import matter from "gray-matter";
 
 interface MemoryVectorEntry {
@@ -61,7 +61,8 @@ export class ServerVaultTools {
     try {
       await access(this.resolve(p));
       return true;
-    } catch {
+    } catch (e) {
+      console.debug("fileExists check failed", e);
       return false;
     }
   }
@@ -73,7 +74,8 @@ export class ServerVaultTools {
   private async readVaultFile(p: string): Promise<string | null> {
     try {
       return await readFile(this.resolve(p), "utf8");
-    } catch {
+    } catch (e) {
+      console.debug("readVaultFile failed", e);
       return null;
     }
   }
@@ -121,7 +123,8 @@ export class ServerVaultTools {
         return `${i + 1}. ${date} (${s.size} bytes) — ${this.SNAPSHOTS_DIR}/${encoded}/${f}`;
       }));
       return `Snapshots for ${path}:\n${list.join("\n")}`;
-    } catch {
+    } catch (e) {
+      console.debug("getSnapshots failed", e);
       return `No snapshots found for: ${path}`;
     }
   }
@@ -147,7 +150,7 @@ export class ServerVaultTools {
           results.push(relative(this.vaultPath, fullPath));
         }
       }
-    } catch { /* directory doesn't exist */ }
+    } catch (e) { console.debug("getAllMarkdownFiles: directory doesn't exist", e); }
     return results;
   }
 
@@ -182,7 +185,7 @@ export class ServerVaultTools {
           this.vectorCache = parsed;
           return this.vectorCache!;
         }
-      } catch { /* corrupted — start fresh */ }
+      } catch (e) { console.debug("loadVectorStore: corrupted, starting fresh", e); }
     }
     this.vectorCache = { version: 1, model: modelId, entries: [] };
     return this.vectorCache;
@@ -220,9 +223,9 @@ export class ServerVaultTools {
         body: JSON.stringify({ model: "text-embedding-3-large", input: text, dimensions: 1536 }),
       });
       if (!res.ok) return null;
-      const data: any = await res.json();
+      const data = await res.json() as { data?: { embedding?: number[] }[] };
       return data?.data?.[0]?.embedding || null;
-    } catch { return null; }
+    } catch (e) { console.debug("getOpenAIEmbedding failed", e); return null; }
   }
 
   private async getOpenAIEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
@@ -236,13 +239,13 @@ export class ServerVaultTools {
         body: JSON.stringify({ model: "text-embedding-3-large", input: texts, dimensions: 1536 }),
       });
       if (!res.ok) return texts.map(() => null);
-      const data: any = await res.json();
+      const data = await res.json() as { data?: { index: number; embedding: number[] }[] };
       const results: (number[] | null)[] = new Array(texts.length).fill(null);
       for (const item of data?.data || []) {
         if (item.index < texts.length) results[item.index] = item.embedding;
       }
       return results;
-    } catch { return texts.map(() => null); }
+    } catch (e) { console.debug("getOpenAIEmbeddings failed", e); return texts.map(() => null); }
   }
 
   private async getGeminiEmbedding(text: string): Promise<number[] | null> {
@@ -256,9 +259,9 @@ export class ServerVaultTools {
         },
       );
       if (!res.ok) return null;
-      const data: any = await res.json();
+      const data = await res.json() as { embedding?: { values?: number[] } };
       return data?.embedding?.values || null;
-    } catch { return null; }
+    } catch (e) { console.debug("getGeminiEmbedding failed", e); return null; }
   }
 
   private async getGeminiEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
@@ -279,14 +282,14 @@ export class ServerVaultTools {
           },
         );
         if (!res.ok) continue;
-        const data: any = await res.json();
+        const data = await res.json() as { embeddings?: { values?: number[] }[] };
         const embeddings = data?.embeddings || [];
         for (let j = 0; j < embeddings.length; j++) {
           if (embeddings[j]?.values) results[i + j] = embeddings[j].values;
         }
       }
       return results;
-    } catch { return results; }
+    } catch (e) { console.debug("getGeminiEmbeddings failed", e); return results; }
   }
 
   // ─── BM25 + Vietnamese Normalization ──────────────────────────
@@ -454,7 +457,8 @@ export class ServerVaultTools {
         }
       }
       return items.length > 0 ? items.join("\n") : "(empty folder)";
-    } catch {
+    } catch (e) {
+      console.debug("listFolder failed", e);
       return `Folder not found: ${path}`;
     }
   }
@@ -470,7 +474,7 @@ export class ServerVaultTools {
         if (s.mtimeMs > cutoff) {
           recent.push({ path: f, mtime: s.mtimeMs });
         }
-      } catch { continue; }
+      } catch (e) { console.debug("getRecentNotes: stat failed", e); continue; }
     }
 
     recent.sort((a, b) => b.mtime - a.mtime);
@@ -504,7 +508,8 @@ export class ServerVaultTools {
       const { data } = matter(content);
       if (Object.keys(data).length === 0) return "No frontmatter properties found.";
       return JSON.stringify(data, null, 2);
-    } catch {
+    } catch (e) {
+      console.debug("readProperties: frontmatter parse failed", e);
       return "No frontmatter properties found.";
     }
   }
@@ -532,15 +537,15 @@ export class ServerVaultTools {
       // Frontmatter tags
       try {
         const { data } = matter(content);
-        const fmTags = (data.tags || []) as string[];
+        const fmTags = Array.isArray(data.tags) ? data.tags.map(String) : [];
         for (const t of fmTags) {
           const tag = t.startsWith("#") ? t : "#" + t;
           tagCounts[tag] = (tagCounts[tag] || 0) + 1;
         }
-      } catch { /* no frontmatter */ }
+      } catch (e) { console.debug("getTags: frontmatter parse failed", e); }
 
       // Inline tags
-      const tagMatches = content.match(/(?:^|\s)(#[a-zA-Z\u00C0-\u024F][\w/\-]*)/g);
+      const tagMatches = content.match(/(?:^|\s)(#[a-zA-Z\u00C0-\u024F][\w/-]*)/g);
       if (tagMatches) {
         for (const m of tagMatches) {
           const tag = m.trim();
@@ -569,9 +574,9 @@ export class ServerVaultTools {
       let found = false;
       try {
         const { data } = matter(content);
-        const fmTags = ((data.tags || []) as string[]).map((t) => t.startsWith("#") ? t : "#" + t);
+        const fmTags = (Array.isArray(data.tags) ? data.tags.map(String) : []).map((t: string) => t.startsWith("#") ? t : "#" + t);
         if (fmTags.includes(normalized)) found = true;
-      } catch { /* no frontmatter */ }
+      } catch (e) { console.debug("searchByTag: frontmatter parse failed", e); }
 
       // Check inline tags
       if (!found && content.includes(normalized)) found = true;
@@ -595,7 +600,7 @@ export class ServerVaultTools {
         const s = await stat(this.resolve(f));
         totalSize += s.size;
         if (now - s.mtimeMs < 7 * 24 * 60 * 60 * 1000) recentCount++;
-      } catch { continue; }
+      } catch (e) { console.debug("getVaultStats: stat failed", e); continue; }
 
       const parts = f.split("/");
       for (let i = 1; i < parts.length; i++) {
@@ -604,7 +609,7 @@ export class ServerVaultTools {
 
       const content = await this.readVaultFile(f);
       if (content) {
-        const tagMatches = content.match(/(?:^|\s)(#[a-zA-Z\u00C0-\u024F][\w/\-]*)/g);
+        const tagMatches = content.match(/(?:^|\s)(#[a-zA-Z\u00C0-\u024F][\w/-]*)/g);
         if (tagMatches) tagMatches.forEach((m) => tagSet.add(m.trim()));
       }
     }
@@ -674,7 +679,8 @@ export class ServerVaultTools {
         } else {
           files = [path];
         }
-      } catch {
+      } catch (e) {
+        console.debug("getTasks: path not found", e);
         return `Path not found: ${path}`;
       }
     }
@@ -779,7 +785,7 @@ export class ServerVaultTools {
       throw new Error(`Brave API error: HTTP ${res.status}`);
     }
 
-    const data = await res.json() as any;
+    const data = await res.json() as { web?: { results?: { title: string; url: string; description?: string }[] } };
     const results: string[] = [];
 
     if (data.web?.results) {
@@ -852,7 +858,8 @@ export class ServerVaultTools {
       ) {
         return "Blocked: cannot fetch internal/private URLs";
       }
-    } catch {
+    } catch (e) {
+      console.debug("webFetch: invalid URL", e);
       return `Invalid URL: ${url}`;
     }
 
@@ -970,7 +977,7 @@ export class ServerVaultTools {
             }
             cosineScores = this.normScores(raw);
           }
-        } catch { /* fallback to BM25 only */ }
+        } catch (e) { console.debug("recallMemory: embedding fallback to BM25 only", e); }
       }
 
       const scored = filtered.map((entry, i) => {
@@ -1046,7 +1053,7 @@ export class ServerVaultTools {
         if (s.mtimeMs >= startMs && s.mtimeMs <= endMs) {
           recentFiles.push({ path: f, mtime: s.mtimeMs });
         }
-      } catch { continue; }
+      } catch (e) { console.debug("gatherRetroData: stat failed", e); continue; }
     }
     recentFiles.sort((a, b) => b.mtime - a.mtime);
     if (recentFiles.length > 0) {

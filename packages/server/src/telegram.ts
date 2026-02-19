@@ -3,7 +3,6 @@ import {
   AIClient,
   buildSystemPrompt,
   getProvider,
-  getI18n,
   VAULT_TOOLS, WEB_TOOLS, KNOWLEDGE_TOOLS, GRAPH_TOOLS,
   TASK_TOOLS, DAILY_TOOLS, CALENDAR_TOOLS, MEMORY_TOOLS,
   type ConversationState,
@@ -199,23 +198,23 @@ export class TelegramBotHandler {
       if (events && !events.includes("No events")) {
         parts.push(`### Upcoming Events (3 days)\n${events}`);
       }
-    } catch { /* no calendar */ }
+    } catch (e) { console.debug("Failed to get calendar events for context", e); }
     try {
       const memories = await this.vaultTools.getRecentMemories(10);
       if (memories && !memories.startsWith("No memories")) {
         parts.push(`### Recent Memories\n${memories}`);
       }
-    } catch { /* no memories */ }
+    } catch (e) { console.debug("Failed to get recent memories for context", e); }
     try {
       const tasks = await this.vaultTools.getPendingDailyTasks();
       if (tasks) parts.push(`### Today's Pending Tasks\n${tasks}`);
-    } catch { /* no tasks */ }
+    } catch (e) { console.debug("Failed to get pending tasks for context", e); }
     try {
       const goals = await this.vaultTools.getGoals();
       if (goals && !goals.includes("No goals file")) {
         parts.push(`### Goals\n${goals.length > 600 ? goals.slice(0, 600) + "\n..." : goals}`);
       }
-    } catch { /* no goals */ }
+    } catch (e) { console.debug("Failed to get goals for context", e); }
     return parts.join("\n\n");
   }
 
@@ -224,15 +223,15 @@ export class TelegramBotHandler {
     try {
       const events = await this.calendarManager.getUpcomingEvents(3);
       if (events && !events.includes("No events")) parts.push(`📅 **Upcoming Events:**\n${events}`);
-    } catch {}
+    } catch (e) { console.debug("Failed to get upcoming events for briefing", e); }
     try {
       const tasks = await this.vaultTools.getPendingDailyTasks();
       if (tasks) parts.push(`✅ **Today's Tasks:**\n${tasks}`);
-    } catch {}
+    } catch (e) { console.debug("Failed to get pending tasks for briefing", e); }
     try {
       const goals = await this.vaultTools.getGoals();
       if (goals && !goals.includes("No goals")) parts.push(`🎯 **Goals:**\n${goals.slice(0, 400)}`);
-    } catch {}
+    } catch (e) { console.debug("Failed to get goals for briefing", e); }
 
     return parts.length > 0
       ? `☀️ **Daily Briefing**\n\n${parts.join("\n\n")}`

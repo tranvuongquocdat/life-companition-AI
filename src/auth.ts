@@ -24,7 +24,7 @@ interface ClaudeCodeCredentials {
  */
 export function readClaudeCodeCredentials(): OAuthTokens {
   if (!Platform.isMacOS) {
-    throw new Error("Hiện tại chỉ hỗ trợ macOS. Vui lòng dùng API Key.");
+    throw new Error("Hiện tại chỉ hỗ trợ macOS. Vui lòng dùng API key.");
   }
 
   try {

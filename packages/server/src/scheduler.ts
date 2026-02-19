@@ -44,7 +44,7 @@ export class Scheduler {
       this.checkReminders().catch((e) => console.error("Reminder check failed:", e));
     }, { timezone: this.config.timezone });
 
-    console.log(
+    console.debug(
       `Scheduler started: briefing@${this.config.morningBriefingHour}h, ` +
       `recap@${this.config.eveningRecapHour}h (${this.config.timezone})`,
     );
@@ -60,19 +60,19 @@ export class Scheduler {
       if (events && !events.includes("No events")) {
         parts.push(`📅 **Upcoming Events:**\n${events}`);
       }
-    } catch {}
+    } catch (e) { console.debug("Failed to get upcoming events for briefing", e); }
 
     try {
       const tasks = await this.vaultTools.getPendingDailyTasks();
       if (tasks) parts.push(`✅ **Today's Tasks:**\n${tasks}`);
-    } catch {}
+    } catch (e) { console.debug("Failed to get pending tasks for briefing", e); }
 
     try {
       const goals = await this.vaultTools.getGoals();
       if (goals && !goals.includes("No goals")) {
         parts.push(`🎯 **Goals:**\n${goals.slice(0, 400)}`);
       }
-    } catch {}
+    } catch (e) { console.debug("Failed to get goals for briefing", e); }
 
     const briefing = parts.length > 0
       ? `☀️ **Morning Briefing**\n\n${parts.join("\n\n")}`
@@ -97,14 +97,14 @@ export class Scheduler {
           parts.push(`✅ Tasks: ${completedCount} done, ${pendingCount} pending`);
         }
       }
-    } catch {}
+    } catch (e) { console.debug("Failed to read daily note for recap", e); }
 
     try {
       const events = await this.calendarManager.getEvents(today);
       if (events && !events.includes("No events")) {
         parts.push(`📅 **Today's Events:**\n${events}`);
       }
-    } catch {}
+    } catch (e) { console.debug("Failed to get events for recap", e); }
 
     const recap = parts.length > 0
       ? `🌙 **Evening Recap**\n\n${parts.join("\n\n")}`
@@ -142,7 +142,7 @@ export class Scheduler {
         await this.vaultTools.writeNote(REMINDERS_PATH, JSON.stringify(active, null, 2));
       }
     } catch (e) {
-      // Silent fail — no reminders file or parse error is ok
+      console.debug("Reminder check failed (no file or parse error)", e);
     }
   }
 
@@ -211,7 +211,7 @@ Examples:
       filtered.push(entry);
       await this.vaultTools.writeNote(REMINDERS_PATH, JSON.stringify(filtered, null, 2));
 
-      console.log(`Planned ${entry.reminders.length} reminders for: ${event.title}`);
+      console.debug(`Planned ${entry.reminders.length} reminders for: ${event.title}`);
     } catch (e) {
       console.error("Failed to plan reminders:", e);
     }

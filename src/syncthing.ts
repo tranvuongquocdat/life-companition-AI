@@ -99,7 +99,7 @@ export class SyncthingClient {
   async getDeviceId(): Promise<string | null> {
     try {
       const status = await this.apiGet("/rest/system/status");
-      return (status?.myID as string) ?? null;
+      return typeof status?.myID === "string" ? status.myID : null;
     } catch (e) {
       console.debug("Syncthing getDeviceId failed:", e);
       return null;
@@ -212,9 +212,9 @@ export class SyncthingClient {
         `/rest/db/status?folder=${encodeURIComponent(folderId)}`,
       );
       return {
-        state: (status?.state as string) ?? "unknown",
-        needFiles: (status?.needFiles as number) ?? 0,
-        globalFiles: (status?.globalFiles as number) ?? 0,
+        state: typeof status?.state === "string" ? status.state : "unknown",
+        needFiles: typeof status?.needFiles === "number" ? status.needFiles : 0,
+        globalFiles: typeof status?.globalFiles === "number" ? status.globalFiles : 0,
       };
     } catch (e) {
       console.debug("Syncthing getFolderStatus failed:", e);
